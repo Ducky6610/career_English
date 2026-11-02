@@ -929,9 +929,474 @@ HIGH-SCHOOL ROLEPLAY RULES:
     };
   }
 
+  /* ==========================================================================
+     DYNAMIC CONTEXT-AWARE & OBJECTIVE-GUIDED DIALOGUE ENGINE
+     ========================================================================== */
+
+  async function callGeminiFastDynamicTurn({ apiKey, scenario, transcriptTurns, userUtterance }) {
+    if (!apiKey) return null;
+
+    const priorHistory = (transcriptTurns || [])
+      .slice(-6)
+      .map((t) => `${t.role === 'ai' ? scenario.aiName : 'Student'}: "${t.text}"`)
+      .join('\n');
+
+    const systemInstruction = `You are roleplaying as ${scenario.aiName} (${scenario.aiRole}, personality: ${scenario.aiPersonality}) in an everyday spoken workplace English conversation with a Taiwanese high school student (${scenario.userRole}) at CEFR A2~B1 level.
+
+Scenario Background:
+${scenario.background}
+
+Student's 3 Mission Objectives:
+${(scenario.objectives || []).map((o, i) => `${i + 1}. ${o}`).join('\n')}
+
+MANDATORY PEDAGOGICAL GUIDELINES:
+1. DYNAMIC RELEVANCE: You MUST listen and directly respond to the specific content, details, names, times, or questions the student actually said. NEVER give a canned or disconnected reply.
+2. OBJECTIVE TRACKING: Check which of the 3 mission objectives the student has completed, and determine which objective is still missing.
+3. SCAFFOLDING & GUIDING: Speak in character as ${scenario.aiName}. Keep your spoken reply to 1-2 short, friendly, natural sentences (around 15-25 words). Naturally ask a guiding follow-up question that leads the student to practice the next uncompleted mission objective.
+4. STARTER HINT: Provide a simple English phrase starter ("guidingHint") that the student can say next to answer your question.`;
+
+    const inputPrompt = `Recent Conversation:\n${priorHistory}\n\nStudent just said: "${userUtterance}"\n\nPlease formulate your dynamic response as ${scenario.aiName}.`;
+
+    const schema = {
+      type: 'object',
+      properties: {
+        en: { type: 'string', description: 'Your spoken English reply as the NPC' },
+        zh: { type: 'string', description: 'Traditional Chinese translation of your reply' },
+        guidingHint: { type: 'string', description: 'A suggested starter phrase in English for the student next turn' }
+      },
+      required: ['en', 'zh', 'guidingHint']
+    };
+
+    try {
+      return await callGeminiFastJSON({
+        apiKey,
+        systemInstruction,
+        inputPrompt,
+        schema,
+        timeoutMs: 3200
+      });
+    } catch (e) {
+      console.warn('Gemini dynamic turn fallback to offline engine:', e);
+      return null;
+    }
+  }
+
+  function getClarificationResponse(s, completed) {
+    const nextIdx = completed.findIndex((c) => !c);
+    const promptIdx = nextIdx >= 0 ? nextIdx : 0;
+    const phrase = s.suggestedPhrases && s.suggestedPhrases[promptIdx] ? s.suggestedPhrases[promptIdx] : null;
+
+    return {
+      en: `No problem at all! Let me rephrase: could you tell me about ${s.objectives ? s.objectives[promptIdx] : 'the details'}?`,
+      zh: `完全沒問題！我換個方式問：能請你跟我聊聊關於「${s.objectives ? s.objectives[promptIdx] : '相關細節'}」嗎？`,
+      guidingHint: phrase ? phrase.en : 'Sure, let me tell you more about that.'
+    };
+  }
+
+  function getMinimalResponse(s, text, completed) {
+    const nextIdx = completed.findIndex((c) => !c);
+    const promptIdx = nextIdx >= 0 ? nextIdx : 0;
+    const phrase = s.suggestedPhrases && s.suggestedPhrases[promptIdx] ? s.suggestedPhrases[promptIdx] : null;
+
+    return {
+      en: `Glad to hear that! Could you elaborate with a complete sentence so I have all the details?`,
+      zh: `很高興聽你這麼說！能請你試著用一個完整的句子把細節說得更清楚嗎？`,
+      guidingHint: phrase ? phrase.en : 'Yes, I would be glad to explain.'
+    };
+  }
+
+  function handleShiftSwapOffline(s, text, completed) {
+    const hasExam = /\b(exam|exams|test|tests|midterm|school|study|studying|busy)\b/i.test(text);
+    const hasDays = /\b(wednesday|thursday|saturday|sunday|weekend|day|shift|swap|change|move)\b/i.test(text);
+    const hasCover = /\b(amy|cover|coworker|colleague|friend|replace|switch with)\b/i.test(text);
+    const hasGratitude = /\b(thank|thanks|appreciate|see you|bye)\b/i.test(text);
+
+    if (hasGratitude && (completed[0] || completed[1] || completed[2])) {
+      return {
+        en: "You're very welcome! Everything on the roster is set. Good luck on your exams, see you on Saturday!",
+        zh: "不客氣！排班表都幫你更新好囉。祝你段考順利，我們週六見！",
+        guidingHint: "Thanks Kevin, have a great day!"
+      };
+    }
+
+    if (completed[0] && completed[1] && completed[2]) {
+      return {
+        en: "That is fantastic! Swapping Wednesday to Saturday for your midterm exam with Amy covering is completely approved. Good luck!",
+        zh: "太棒了！因段考把週三換到週六，且 Amy 願意代班，換班完全核准。祝你考試順利！",
+        guidingHint: "Thank you so much Kevin! I really appreciate your understanding."
+      };
+    }
+
+    if (hasCover && !completed[0]) {
+      return {
+        en: "That is great that Amy can cover for you! What is the reason you need to swap shifts, and which day will you work instead?",
+        zh: "太好了，Amy 能幫忙代班！那你想換班的原因是什麼？你想調到哪一天來補班呢？",
+        guidingHint: "I have a school midterm exam next Thursday, so I would like to work on Saturday."
+      };
+    }
+
+    if (hasExam && !completed[1]) {
+      return {
+        en: "I completely understand—school exams are very important! Which day's shift do you need to adjust, and when can you work instead?",
+        zh: "我完全理解——學校段考非常重要！你需要調整哪一天的班？想換到哪一天來補班呢？",
+        guidingHint: "Could I swap my Wednesday evening shift to Saturday afternoon?"
+      };
+    }
+
+    if ((hasDays || completed[1]) && !completed[2]) {
+      return {
+        en: "Moving your Wednesday shift to Saturday sounds workable! But Wednesday is busy—have you asked Amy or another coworker to cover for you?",
+        zh: "把週三換到週六聽起來可行！不過週三晚上挺忙的——你有先問過 Amy 或其他同事能不能幫你代班嗎？",
+        guidingHint: "I already asked Amy, and she said she can cover my shift on Wednesday."
+      };
+    }
+
+    return {
+      en: "I see! Could you let me know why you need to adjust your schedule and which shift you'd like to change?",
+      zh: "了解！能請你說明你需要調班的原因，以及你想換哪一天的班嗎？",
+      guidingHint: "Hi Kevin, I have an important school exam next week."
+    };
+  }
+
+  function handleCafeBaristaOffline(s, text, completed) {
+    const hasOat = /\b(oat|oatmilk|milk|dairy|plant)\b/i.test(text);
+    const hasPrice = /\b(dollar|dollars|extra|charge|cost|price|one)\b/i.test(text);
+    const hasTime = /\b(minute|minutes|ready|wait|fast|soon|quick|three|3|bus)\b/i.test(text);
+    const hasPay = /\b(apple pay|credit|card|cash|pay|receipt)\b/i.test(text);
+
+    if (hasPay || (completed[0] && completed[1] && completed[2])) {
+      return {
+        en: "Here is my phone for Apple Pay! Thank you so much for the speedy service, you saved my day!",
+        zh: "這是我感應 Apple Pay 的手機！非常感謝你迅速又親切的服務，幫了我大忙！",
+        guidingHint: "Thank you! Here is your receipt. Enjoy your coffee and have a safe trip!"
+      };
+    }
+
+    if (hasOat || hasPrice) {
+      if (!completed[2]) {
+        return {
+          en: "One dollar extra for oat milk is totally fine! How many minutes do you think it will take? Remember I have a bus to catch!",
+          zh: "燕麥奶加一塊錢完全沒問題！請問大約需要等幾分鐘呢？記得我等等要趕公車喔！",
+          guidingHint: "It will be ready in about three minutes, so you will definitely catch your bus!"
+        };
+      } else {
+        return {
+          en: "Awesome, large iced oat milk latte in three minutes is perfect! Can I pay by Apple Pay or credit card?",
+          zh: "太棒了，三分鐘做好大杯燕麥奶冰拿鐵很完美！請問我可以刷 Apple Pay 或信用卡嗎？",
+          guidingHint: "Yes, we accept Apple Pay and credit cards! That will be five dollars."
+        };
+      }
+    }
+
+    if (hasTime && !completed[1]) {
+      return {
+        en: "Three minutes is super fast! And did you remember to make it with oat milk? How much is the extra charge?",
+        zh: "三分鐘非常快！那你有記得幫我換成燕麥奶嗎？請問要加多少錢呢？",
+        guidingHint: "Yes, we have oat milk! It is just one dollar extra."
+      };
+    }
+
+    return {
+      en: "Hi! Can you make that large iced latte with oat milk, and will it be ready before my bus comes in ten minutes?",
+      zh: "嗨！請問大杯冰拿鐵可以換成燕麥奶嗎？在我的公車十分鐘後到達前能做好嗎？",
+      guidingHint: "Welcome! Sure, one large iced latte with oat milk, ready in three minutes!"
+    };
+  }
+
+  function handleCampusEventOffline(s, text, completed) {
+    const hasReg = /\b(registration|desk|straight|left|badge|badge desk|counter)\b/i.test(text);
+    const hasFloor = /\b(second|2nd|floor|upstairs|elevator|stairs|main hall)\b/i.test(text);
+    const hasTime = /\b(ten|10|start|starts|opening|enjoy|speech|ceremony)\b/i.test(text);
+
+    if (hasTime || (completed[0] && completed[1] && completed[2])) {
+      return {
+        en: "Ten o'clock, perfect! Thank you for the wonderful directions and welcoming smile. Have a great day volunteering!",
+        zh: "十點整，太好了！謝謝你清楚的指引和親切的微笑。祝你今天志工服務順利！",
+        guidingHint: "You're very welcome! Please let me know if you need any other assistance."
+      };
+    }
+
+    if (hasReg && !completed[1]) {
+      return {
+        en: "Straight and left for the badge—got it! And after picking it up, which floor is the Main Hall on?",
+        zh: "直走左轉領名牌——收到！那領完之後，主演講廳是在幾樓呢？",
+        guidingHint: "You can take the stairs or elevator to the second floor for the Main Hall."
+      };
+    }
+
+    if (hasFloor && !completed[2]) {
+      return {
+        en: "Second floor, thanks! By the way, do you know what time the opening ceremony begins today?",
+        zh: "二樓，謝謝你！順便請教一下，你知道今天開幕式幾點開始嗎？",
+        guidingHint: "The opening speech starts at ten o'clock. Enjoy the event today!"
+      };
+    }
+
+    return {
+      en: "Excuse me! Where can I get my name badge, and how do I get to the Main Hall?",
+      zh: "不好意思！去哪裡可以領名牌，還有主演講廳要怎麼走呢？",
+      guidingHint: "Welcome! The registration desk is straight and to the left."
+    };
+  }
+
+  function handlePhoneMessageOffline(s, text, completed) {
+    const hasMeeting = /\b(meeting|busy|away|not available|sorry|out)\b/i.test(text);
+    const hasMessage = /\b(message|name|who|calling|take|leave)\b/i.test(text);
+    const hasNumber = /\b(number|phone|call back|return|digits|reach)\b/i.test(text);
+
+    if (completed[0] && completed[1] && completed[2]) {
+      return {
+        en: "You have been so polite and helpful! I appreciate your message taking. Have a great afternoon, goodbye!",
+        zh: "你非常有禮貌而且幫了大忙！謝謝你幫忙記錄口訊。祝你有個美好的下午，再見！",
+        guidingHint: "Thank you Mr. Green, have a great day, goodbye!"
+      };
+    }
+
+    if (hasNumber || (hasMessage && completed[0])) {
+      return {
+        en: "My number is 555-0192. Please ask Mr. Lin to call me back as soon as his meeting finishes. Thank you!",
+        zh: "我的號碼是 555-0192。請他在會議結束後儘快回電給我。謝謝你！",
+        guidingHint: "Got it, 555-0192. I will ask Mr. Lin to call you back right away."
+      };
+    }
+
+    if (hasMeeting && !completed[1]) {
+      return {
+        en: "Oh, I see. In that case, may I leave a message for him, and can you ask him to call me back?",
+        zh: "喔，我了解。那樣的話，我可以幫林先生留個口訊嗎？可以請他回電給我嗎？",
+        guidingHint: "May I take a message for you, and could I have your phone number?"
+      };
+    }
+
+    return {
+      en: "Hello, this is David Green from Sunrise Trading. Is Mr. Lin available right now?",
+      zh: "哈囉，我是 Sunrise Trading 的 David Green。請問林先生現在方便講話嗎？",
+      guidingHint: "Hello Mr. Green! I am sorry, Mr. Lin is in a meeting right now."
+    };
+  }
+
+  function handleInterviewOffline(s, text, completed) {
+    const hasIntro = /\b(name|student|grade|high school|enjoy|like|interested)\b/i.test(text);
+    const hasClub = /\b(club|team|photography|activity|project|member|leader|organized)\b/i.test(text);
+    const hasGoals = /\b(internship|learn|skills|future|grow|experience|apply|communication)\b/i.test(text);
+
+    if (completed[0] && completed[1] && completed[2]) {
+      return {
+        en: "I love your ambition and passion to grow! You clearly have great communication skills. Do you have any questions for me?",
+        zh: "我很欣賞你的熱忱與成長企圖心！你顯然具備優秀的溝通能力。你有任何問題想問我嗎？",
+        guidingHint: "Thank you Sarah! Could you tell me more about the daily projects for interns?"
+      };
+    }
+
+    if (hasClub || (hasIntro && !completed[1])) {
+      if (!completed[2]) {
+        return {
+          en: "That club experience shows wonderful teamwork! What is the main skill or goal you hope to achieve during this summer internship?",
+          zh: "社團經驗展現了很棒的團隊合作！在這次暑期實習中，你最希望學到的主要技能或目標是什麼呢？",
+          guidingHint: "I want to gain real-world experience and improve my communication skills."
+        };
+      }
+    }
+
+    if (hasIntro && !completed[1]) {
+      return {
+        en: "Nice to meet you! It is great to hear about your school interests. Could you share an experience from a school club or team project?",
+        zh: "很高興認識你！很高興聽到你的學校興趣。你能分享一個你在學校社團或團隊專案中的具體經驗嗎？",
+        guidingHint: "In school, I am in the photography club, where I learned how to work with teammates."
+      };
+    }
+
+    return {
+      en: "Welcome to our summer internship interview! Could you please introduce yourself and tell me about your favorite school club?",
+      zh: "歡迎來到我們的暑期實習面試！能請你自我介紹，並聊聊你最喜歡的學校社團嗎？",
+      guidingHint: "Hi Sarah! I am a high school student and I really enjoy English and media."
+    };
+  }
+
+  function handleBubbleTeaOffline(s, text, completed) {
+    const hasRecommend = /\b(recommend|popular|brown sugar|boba|bubble|tea|chewy|pearls)\b/i.test(text);
+    const hasSugarIce = /\b(sugar|ice|half|less|percent|sweetness|level)\b/i.test(text);
+    const hasCheckout = /\b(dollar|dollars|total|sixty|here|go|takeout|bag|receipt)\b/i.test(text);
+
+    if (hasCheckout || (completed[0] && completed[1] && completed[2])) {
+      return {
+        en: "Here is sixty dollars, and to go please! Thanks for the awesome recommendation, I can't wait to try it!",
+        zh: "這是六十元，麻煩幫我外帶！謝謝你熱情的推薦，我迫不及待想喝了！",
+        guidingHint: "Here is your drink and change. Enjoy your bubble tea in Taiwan!"
+      };
+    }
+
+    if (hasRecommend && !completed[1]) {
+      return {
+        en: "Brown sugar bubble milk tea sounds heavenly! How should I choose the sugar and ice levels? What do you recommend?",
+        zh: "黑糖珍珠鮮奶茶聽起來太美味了！甜度跟冰塊我該怎麼選？你有推薦的黃金比例嗎？",
+        guidingHint: "I recommend half sugar and less ice—it tastes just right and not too sweet!"
+      };
+    }
+
+    if (hasSugarIce && !completed[2]) {
+      return {
+        en: "Half sugar and less ice is locked in! How much will that be, and is it for here or to go?",
+        zh: "半糖少冰決定了！請問這樣多少錢？要內用還是外帶呢？",
+        guidingHint: "That will be sixty dollars in total. Would you like it for here or to go?"
+      };
+    }
+
+    return {
+      en: "Hi! This is my first time trying Taiwanese bubble tea! What drink do you recommend, and how are the sugar and ice levels chosen?",
+      zh: "嗨！這是我第一次喝台灣珍奶！你推薦什麼飲料？甜度冰塊該怎麼選呢？",
+      guidingHint: "Welcome! Our most popular drink is the Brown Sugar Bubble Milk Tea."
+    };
+  }
+
+  function handleMentorUpdateOffline(s, text, completed) {
+    const hasDraft = /\b(draft|poster|finished|done|completed|layout|first)\b/i.test(text);
+    const hasQuestions = /\b(logo|font|size|title|not sure|question|where|color)\b/i.test(text);
+    const hasFeedback = /\b(feedback|look|check|advice|help|few minutes|time)\b/i.test(text);
+
+    if (hasFeedback || (completed[0] && completed[1] && completed[2])) {
+      return {
+        en: "Of course! Let's look at your screen together. Usually the logo belongs in the top-right corner. You did an amazing job asking proactively!",
+        zh: "當然可以！我們一起看妳的螢幕吧。通常 Logo 會放在右上角。妳能主動發問做得太棒了！",
+        guidingHint: "Thank you so much Chloe! I will make those adjustments right away."
+      };
+    }
+
+    if (hasDraft && !completed[1]) {
+      return {
+        en: "Great work finishing the first draft so quickly! Did you run into any design questions or things you're not sure about?",
+        zh: "這麼快就完成第一版初稿做得很好！你有遇到什麼設計上的問題或不確定的地方嗎？",
+        guidingHint: "I am not sure where to place the company logo and if the title font is big enough."
+      };
+    }
+
+    if (hasQuestions && !completed[2]) {
+      return {
+        en: "Good question! Logo placement is key. Do you want me to take a quick look right now and give you some feedback?",
+        zh: "問得好！Logo 的擺放很關鍵。需要我現在花幾分鐘看一下，給妳一點修改建議嗎？",
+        guidingHint: "Do you have a few minutes to take a look and give me some feedback?"
+      };
+    }
+
+    return {
+      en: "Hey! How is your internship going, and how are you doing with the social media poster design?",
+      zh: "嘿！實習第一週還適應嗎？社群活動海報的設計進度如何呢？",
+      guidingHint: "Hi Chloe! I just finished the first draft of the poster."
+    };
+  }
+
+  function handleBookstoreOffline(s, text, completed) {
+    const hasStock = /\b(have|stock|guide|book|yes|available|copy)\b/i.test(text);
+    const hasAisle = /\b(aisle|shelf|section|b|over there|follow|find)\b/i.test(text);
+    const hasCheckout = /\b(pay|counter|cashier|wrap|wrapping|gift|free|register)\b/i.test(text);
+
+    if (hasCheckout || (completed[0] && completed[1] && completed[2])) {
+      return {
+        en: "Free gift wrapping is lovely! Here is my card for payment. Thank you so much for your kind help today, you made my day!",
+        zh: "免費禮物包裝太貼心了！這是我的卡片用來結帳。非常謝謝你今天親切的協助！",
+        guidingHint: "You're very welcome! Here is your wrapped gift and receipt. Have a great day!"
+      };
+    }
+
+    if (hasStock && !completed[1]) {
+      return {
+        en: "Oh wonderful, you have it in stock! Could you show me which aisle or bookshelf I can find it on?",
+        zh: "太好了你們有現貨！請問你能告訴我在哪一條走道或書架上可以找到它嗎？",
+        guidingHint: "It is located in aisle B on the travel shelf. Follow me, please."
+      };
+    }
+
+    if (hasAisle && !completed[2]) {
+      return {
+        en: "Found it, thank you! I'm buying this as a gift for a friend—where can I pay, and do you offer gift wrapping?",
+        zh: "找到了，謝謝！這是我要買來送朋友的禮物——請問在哪裡結帳，你們有禮物包裝服務嗎？",
+        guidingHint: "You can pay at the front counter, and we provide free gift wrapping!"
+      };
+    }
+
+    return {
+      en: "Excuse me, do you have the English edition of the Taiwan Travel Guide in stock?",
+      zh: "不好意思，請問你們有英文版《台灣旅遊指南》的現貨庫存嗎？",
+      guidingHint: "Yes, we have it in stock! Let me show you where it is."
+    };
+  }
+
+  function handleCustomScenarioOffline(s, text, completed, turnCount) {
+    const nextIdx = completed.findIndex((c) => !c);
+    const promptIdx = nextIdx >= 0 ? nextIdx : (turnCount % (s.objectives ? s.objectives.length : 1));
+    const nextObj = s.objectives && s.objectives[promptIdx] ? s.objectives[promptIdx] : 'the next step';
+    const phrase = s.suggestedPhrases && s.suggestedPhrases[promptIdx] ? s.suggestedPhrases[promptIdx] : null;
+
+    if (completed.every(Boolean)) {
+      return {
+        en: "Everything sounds completely clear and well explained! You did an amazing job completing all the objectives. Thank you!",
+        zh: "所有事情都溝通得非常清楚！你非常出色地達成了所有任務目標。謝謝你！",
+        guidingHint: "Thank you so much! It was a pleasure talking with you."
+      };
+    }
+
+    return {
+      en: `Got it! That is very clear. Next, could you tell me about ${nextObj}?`,
+      zh: `了解！這樣說非常清楚。接下來，能請你跟我說明關於「${nextObj}」的部分嗎？`,
+      guidingHint: phrase ? phrase.en : `I would be happy to explain ${nextObj}.`
+    };
+  }
+
+  function generateGuidedResponseOffline({ scenario, transcriptTurns, userUtterance }) {
+    const s = scenario || {};
+    const text = (userUtterance || '').toLowerCase().trim();
+    const words = text.split(/\s+/).filter(Boolean);
+
+    const userTurns = (transcriptTurns || []).filter((t) => t.role === 'user');
+    const allUserLower = userTurns.map((t) => t.text.toLowerCase()).join(' ') + ' ' + text;
+
+    const completed = [false, false, false];
+    if (s.objectiveKeywords) {
+      s.objectiveKeywords.forEach((kws, i) => {
+        completed[i] = (kws || []).some((k) => allUserLower.includes(k.toLowerCase()));
+      });
+    }
+
+    // Clarification intent
+    const isClarify = /\b(pardon|repeat|again|what did you say|sorry|excuse me|can you say that again|don't understand|didn't understand)\b/i.test(text);
+    if (isClarify && words.length <= 8) {
+      return getClarificationResponse(s, completed);
+    }
+
+    // Minimal intent
+    const isMinimal = /^(yes|yeah|yep|ok|okay|sure|fine|no|nope|hello|hi|hey|thanks|thank you)\b/i.test(text) && words.length <= 2;
+    if (isMinimal) {
+      return getMinimalResponse(s, text, completed);
+    }
+
+    const scenarioId = s.id || '';
+    if (scenarioId === 'shift-swap-request') return handleShiftSwapOffline(s, text, completed);
+    if (scenarioId === 'cafe-barista-order') return handleCafeBaristaOffline(s, text, completed);
+    if (scenarioId === 'campus-event-guide') return handleCampusEventOffline(s, text, completed);
+    if (scenarioId === 'phone-message-taking') return handlePhoneMessageOffline(s, text, completed);
+    if (scenarioId === 'summer-internship-interview') return handleInterviewOffline(s, text, completed);
+    if (scenarioId === 'bubble-tea-order') return handleBubbleTeaOffline(s, text, completed);
+    if (scenarioId === 'intern-mentor-update') return handleMentorUpdateOffline(s, text, completed);
+    if (scenarioId === 'bookstore-part-time') return handleBookstoreOffline(s, text, completed);
+
+    return handleCustomScenarioOffline(s, text, completed, userTurns.length);
+  }
+
+  async function generateDynamicRoleplayTurn({ apiKey, scenario, transcriptTurns, userUtterance }) {
+    if (apiKey) {
+      const aiRes = await callGeminiFastDynamicTurn({ apiKey, scenario, transcriptTurns, userUtterance });
+      if (aiRes && aiRes.en) {
+        return aiRes;
+      }
+    }
+    return generateGuidedResponseOffline({ scenario, transcriptTurns, userUtterance });
+  }
+
   window.ExecVoice.GeminiLiveSessionManager = GeminiLiveSessionManager;
   window.ExecVoice.generateScenarioWithAI = generateScenarioWithAI;
   window.ExecVoice.generateRealtimeHint = generateRealtimeHint;
   window.ExecVoice.evaluateSpeakingSession = evaluateSpeakingSession;
   window.ExecVoice.evaluateSpeakingSessionInstant = evaluateSpeakingSessionInstant;
+  window.ExecVoice.generateDynamicRoleplayTurn = generateDynamicRoleplayTurn;
+  window.ExecVoice.generateGuidedResponseOffline = generateGuidedResponseOffline;
 })();

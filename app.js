@@ -1450,7 +1450,8 @@
       document.getElementById('orb-status-label').textContent = `${s.aiName} 正在說話...`;
 
       if (this.transcriptTurns.length === 0) {
-        this.appendTranscriptTurn('ai', s.openingLine, s.openingLineZh);
+        const firstHint = (s.suggestedPhrases && s.suggestedPhrases[0]) ? s.suggestedPhrases[0].en : '';
+        this.appendTranscriptTurn('ai', s.openingLine, s.openingLineZh, firstHint);
       }
 
       const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1622,33 +1623,68 @@
       }
     }
 
-    respondInBrowserDemoMode() {
+    async respondInBrowserDemoMode(userSentence = '') {
       const s = this.selectedScenario;
-      const userTurns = this.transcriptTurns.filter((t) => t.role === 'user');
-      const userTurnCount = userTurns.length;
+      if (!s) return;
 
       this.updateMissionCheckboxesFromTranscript();
 
-      const followUps = s.contextualFollowUps || [
-        {
-          en: 'Got it! Could you tell me a little bit more detail about that?',
-          zh: '了解了！能請你再多告訴我一點細節嗎？'
-        },
-        {
-          en: 'That sounds great! Thank you so much for your help today.',
-          zh: '聽起來太棒了！非常謝謝你今天的幫忙。'
-        }
-      ];
-
-      const reply = followUps[(userTurnCount - 1) % followUps.length];
-
-      // Immediately pause speech recognition before AI starts speaking so AI never hears itself!
+      // Immediately pause speech recognition before AI starts processing so user's speech is not echoed
       this.pauseSpeechRecognitionForAiOutput();
+
+      const orb = document.getElementById('voice-orb');
+      const statusLabel = document.getElementById('orb-status-label');
+      if (statusLabel) {
+        statusLabel.textContent = `${s.aiName} 正在思考並回應...`;
+      }
+
+      if (!userSentence) {
+        const lastUserTurn = [...this.transcriptTurns].reverse().find((t) => t.role === 'user');
+        if (lastUserTurn) userSentence = lastUserTurn.text;
+      }
+
+      // Generate dynamic guided response with entity tracking and next-step scaffolding
+      let reply = null;
+      if (window.ExecVoice && typeof window.ExecVoice.generateDynamicRoleplayTurn === 'function') {
+        try {
+          reply = await window.ExecVoice.generateDynamicRoleplayTurn({
+            apiKey: this.apiKey,
+            scenario: s,
+            transcriptTurns: this.transcriptTurns,
+            userUtterance: userSentence
+          });
+        } catch (err) {
+          console.warn('[respondInBrowserDemoMode] Dynamic turn engine error:', err);
+        }
+      }
+
+      if (!reply || !reply.en) {
+        const userTurns = this.transcriptTurns.filter((t) => t.role === 'user');
+        const userTurnCount = userTurns.length;
+        const followUps = s.contextualFollowUps || [
+          {
+            en: 'Got it! Could you tell me a little bit more detail about that?',
+            zh: '了解了！能請你再多告訴我一點細節嗎？',
+            guidingHint: 'Could you please explain that once more?'
+          },
+          {
+            en: 'That sounds great! Thank you so much for your help today.',
+            zh: '聽起來太棒了！非常謝謝你今天的幫忙。',
+            guidingHint: 'Thank you for your assistance!'
+          }
+        ];
+        const rawReply = followUps[(userTurnCount - 1) % followUps.length];
+        reply = {
+          en: rawReply.en,
+          zh: rawReply.zh,
+          guidingHint: rawReply.guidingHint || ''
+        };
+      }
 
       setTimeout(() => {
         if (!this.isCallActive) return;
-        this.appendTranscriptTurn('ai', reply.en, reply.zh);
-        const orb = document.getElementById('voice-orb');
+        this.appendTranscriptTurn('ai', reply.en, reply.zh, reply.guidingHint);
+        this.updateMissionCheckboxesFromTranscript();
         orb?.classList.add('ai-speaking');
 
         speakWithBrowserTTS(
@@ -1656,13 +1692,17 @@
           () => {
             this.pauseSpeechRecognitionForAiOutput();
             orb?.classList.add('ai-speaking');
-            document.getElementById('orb-status-label').textContent = `${s.aiName} 正在回應...`;
+            if (statusLabel) {
+              statusLabel.textContent = `${s.aiName} 正在回應...`;
+            }
           },
           () => {
             orb?.classList.remove('ai-speaking');
             if (this.isCallActive) {
-              document.getElementById('orb-status-label').textContent =
-                '🎙️ 換你說英文囉！(或點擊「📊 結束並產出評鑑報告」查看你的專屬評分)';
+              if (statusLabel) {
+                statusLabel.textContent =
+                  '🎙️ 換你說英文囉！(點擊下方提示可快速帶入句型，或直接對麥克風說話)';
+              }
               this.resumeSpeechRecognitionAfterAiOutput();
             }
           },
@@ -1769,11 +1809,12 @@
       }
     }
 
-    appendTranscriptTurn(role, text, zhTranslation = '') {
+    appendTranscriptTurn(role, text, zhTranslation = '', guidingHint = '') {
       this.transcriptTurns.push({
         role,
         text,
         zhTranslation,
+        guidingHint,
         timestamp: Date.now(),
         isStreaming: false
       });
@@ -1820,6 +1861,29 @@
                   ? `<p class="bubble-zh">${this.escapeHtml(turn.zhTranslation)}</p>`
                   : ''
               }
+              ${
+                turn.role === 'ai' && turn.guidingHint
+                  ? `
+                  <div class="bubble-guiding-hint">
+                    <div class="hint-header">
+                      <span class="hint-badge">💡 任務引導提示</span>
+                      <span class="hint-sub">你可以這樣回覆：</span>
+                    </div>
+                    <div class="hint-content">
+                      <span class="hint-text">&ldquo;${this.escapeHtml(turn.guidingHint)}&rdquo;</span>
+                      <div class="hint-btns">
+                        <button class="btn-mini-speak btn-hint-speak" data-speak="${this.escapeHtml(
+                          turn.guidingHint
+                        )}" title="聽示範發音">🔊 聽示範</button>
+                        <button class="btn-use-hint" data-hint="${this.escapeHtml(
+                          turn.guidingHint
+                        )}" title="帶入下方輸入框">帶入句子 ✍️</button>
+                      </div>
+                    </div>
+                  </div>
+                  `
+                  : ''
+              }
             </div>
           </div>
         `;
@@ -1832,6 +1896,18 @@
             apiKey: this.apiKey,
             aiVoice: this.selectedScenario?.aiVoice
           });
+        });
+      });
+
+      box.querySelectorAll('.btn-use-hint').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const hint = btn.dataset.hint;
+          const input = document.getElementById('studio-text-input');
+          if (input && hint) {
+            input.value = hint;
+            input.focus();
+            this.showToast('💡 已為你帶入引導句型，可直接發送或依情境微調！');
+          }
         });
       });
 
@@ -2168,7 +2244,8 @@
       this.appendTranscriptTurn(
         'ai',
         this.selectedScenario.openingLine,
-        this.selectedScenario.openingLineZh
+        this.selectedScenario.openingLineZh,
+        'Hi! Yes, we have oat milk, but it costs one dollar extra. How long will it take?'
       );
 
       const turn1 = 'Hi! Yes we have oat milk, it is one dollar extra. Wait 3 minute please.';
@@ -2178,7 +2255,8 @@
       this.appendTranscriptTurn(
         'ai',
         'Awesome, three minutes is fast! Can I pay by credit card or Apple Pay?',
-        '太棒了，三分鐘很快！請問我可以刷信用卡或用 Apple Pay 嗎？'
+        '太棒了，三分鐘很快！請問我可以刷信用卡或用 Apple Pay 嗎？',
+        'Yes, you can pay with credit card or Apple Pay!'
       );
 
       const turn2 = 'Um, yes you can use Apple Pay here. Thank you!';

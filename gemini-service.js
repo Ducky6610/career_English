@@ -1,6 +1,15 @@
 (function () {
   window.ExecVoice = window.ExecVoice || {};
 
+  const DEFAULT_API_KEY = (function () {
+    try {
+      return atob('QVEuQWI4Uk42STJCZUQxcjM5YkotMFN5WTdEYjg2Y1M3R0lra1gtVDIwOGp0Vm9ZYkJjdVE=');
+    } catch (_) {
+      return '';
+    }
+  })();
+  window.ExecVoice.DEFAULT_API_KEY = DEFAULT_API_KEY;
+
   function buildRoleplaySystemInstruction(scenario) {
     return `You are roleplaying a friendly, realistic workplace / part-time job / internship conversation in English with a HIGH SCHOOL STUDENT (CEFR A2 to B1 level).
 
@@ -1399,4 +1408,5 @@ MANDATORY PEDAGOGICAL GUIDELINES:
   window.ExecVoice.evaluateSpeakingSessionInstant = evaluateSpeakingSessionInstant;
   window.ExecVoice.generateDynamicRoleplayTurn = generateDynamicRoleplayTurn;
   window.ExecVoice.generateGuidedResponseOffline = generateGuidedResponseOffline;
+  window.ExecVoice.DEFAULT_API_KEY = DEFAULT_API_KEY;
 })();

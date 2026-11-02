@@ -453,11 +453,11 @@
       </div>
       <div class="modal-body">
         <p class="modal-desc">
-          不填寫金鑰即可直接遊玩「模擬城市 3D 職場大富翁」完整語音辨識與即時評鑑！若輸入您的 Google Gemini API Key，則可額外啟用 <strong>Gemini 3.8 Live (`gemini-3.8-live`)</strong> 原生雙向語音串流。金鑰僅儲存在您的瀏覽器本機 (`localStorage`)。
+          系統已為您<strong>預設綁定專屬 Gemini API Key</strong>，可直接啟用 <strong>Gemini 3.8 Live (`gemini-3.8-live`)</strong> 真人雙向語音串流、AI 建築題庫設計與即時口語評鑑！您也可以在此輸入自訂金鑰，或隨時點擊恢復預設。
         </p>
         <label class="form-field">
           <span>Gemini API Key</span>
-          <input id="gemini-api-key-input" type="password" placeholder="AIzaSy..." autocomplete="off" />
+          <input id="gemini-api-key-input" type="password" placeholder="預設已綁定 API Key 或輸入自訂金鑰..." autocomplete="off" />
         </label>
         <label class="form-field">
           <span>即時語音對練模型 (Gemini Live Model)</span>
@@ -467,8 +467,9 @@
           </select>
         </label>
       </div>
-      <div class="modal-footer">
-        <button id="save-api-key-btn" class="btn-primary-large full-width">儲存設定</button>
+      <div class="modal-footer" style="display: flex; gap: 10px; margin-top: 14px;">
+        <button id="reset-api-key-btn" type="button" class="btn-secondary" style="flex: 1;">恢復預設金鑰</button>
+        <button id="save-api-key-btn" type="button" class="btn-primary-large" style="flex: 2;">儲存設定</button>
       </div>
     </div>
   </div>

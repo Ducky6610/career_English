@@ -11,6 +11,16 @@
     generateRealtimeHint
   } = window.ExecVoice;
 
+  const DEFAULT_API_KEY =
+    window.ExecVoice?.DEFAULT_API_KEY ||
+    (function () {
+      try {
+        return atob('QVEuQWI4Uk42STJCZUQxcjM5YkotMFN5WTdEYjg2Y1M3R0lra1gtVDIwOGp0Vm9ZYkJjdVE=');
+      } catch (_) {
+        return '';
+      }
+    })();
+
   const STORAGE_KEYS = {
     API_KEY: 'workplace_english_gemini_api_key',
     LIVE_MODEL: 'workplace_english_live_model',
@@ -205,7 +215,15 @@
 
   class WorkplaceEnglishApp {
     constructor() {
-      this.apiKey = this.safeGetStorage(STORAGE_KEYS.API_KEY) || '';
+      const storedKey = this.safeGetStorage(STORAGE_KEYS.API_KEY);
+      if (storedKey === 'OFF' || storedKey === 'none') {
+        this.apiKey = '';
+      } else if (storedKey && storedKey.trim()) {
+        this.apiKey = storedKey.trim();
+      } else {
+        this.apiKey = DEFAULT_API_KEY;
+        this.safeSetStorage(STORAGE_KEYS.API_KEY, DEFAULT_API_KEY);
+      }
       this.liveModel = this.safeGetStorage(STORAGE_KEYS.LIVE_MODEL) || 'gemini-3.8-live';
       this.customScenarios = this.loadCustomScenarios();
       this.allScenarios = [...this.customScenarios, ...BUILTIN_SCENARIOS];
@@ -467,15 +485,28 @@
       });
 
       saveApiKeyBtn?.addEventListener('click', () => {
-        this.apiKey = apiKeyInput.value.trim();
+        const inputVal = apiKeyInput.value.trim();
+        if (!inputVal) {
+          this.apiKey = '';
+          this.safeSetStorage(STORAGE_KEYS.API_KEY, 'OFF');
+          this.showToast('已切換為免金鑰模式（使用本地智慧語意引擎）');
+        } else {
+          this.apiKey = inputVal;
+          this.safeSetStorage(STORAGE_KEYS.API_KEY, this.apiKey);
+          this.showToast('✅ 已儲存 Gemini API Key 與模型設定！');
+        }
         this.liveModel = liveModelSelect.value;
-        this.safeSetStorage(STORAGE_KEYS.API_KEY, this.apiKey);
         this.safeSetStorage(STORAGE_KEYS.LIVE_MODEL, this.liveModel);
         this.updateApiKeyStatusUI();
         apiModal.classList.add('hidden');
-        this.showToast(
-          this.apiKey ? '✅ 已儲存 Gemini API Key 與模型設定！' : '已切換為免金鑰智慧語音模式'
-        );
+      });
+
+      document.getElementById('reset-api-key-btn')?.addEventListener('click', () => {
+        this.apiKey = DEFAULT_API_KEY;
+        apiKeyInput.value = DEFAULT_API_KEY;
+        this.safeSetStorage(STORAGE_KEYS.API_KEY, DEFAULT_API_KEY);
+        this.updateApiKeyStatusUI();
+        this.showToast('🔄 已恢復為系統預設綁定的 Gemini API Key！');
       });
 
       const aiGenBtn = document.getElementById('ai-generate-scenario-btn');
@@ -571,21 +602,24 @@
       const badge = document.getElementById('open-api-modal-btn');
       const modeLabel = document.getElementById('studio-engine-badge');
       if (this.apiKey) {
+        const isDefault = this.apiKey === DEFAULT_API_KEY;
         if (badge) {
           badge.textContent = `⚡ Gemini Live 已啟用 (${this.liveModel})`;
           badge.className = 'status-pill status-connected';
         }
         if (modeLabel) {
-          modeLabel.textContent = `語音引擎：${this.liveModel} (24kHz 真人雙向語音) ｜ 程度：高中生 A2~B1`;
+          modeLabel.textContent = `語音引擎：${this.liveModel} (24kHz 真人雙向語音${
+            isDefault ? '・系統預設綁定' : ''
+          }) ｜ 程度：高中生 A2~B1`;
         }
       } else {
         if (badge) {
-          badge.textContent = '🔑 設定 API Key (目前為免金鑰雲端神經語音模式)';
+          badge.textContent = '🔑 設定 API Key (目前為免金鑰智慧語意模式)';
           badge.className = 'status-pill status-demo';
         }
         if (modeLabel) {
           modeLabel.textContent =
-            '語音引擎：雲端擬真神經語音 ＋ 5 候選情境語音校正 ｜ 程度：高中生 A2~B1';
+            '語音引擎：本地擬真語音 ＋ 動態語意引導狀態機 ｜ 程度：高中生 A2~B1';
         }
       }
     }

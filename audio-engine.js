@@ -477,8 +477,14 @@ registerProcessor('pcm-capture-processor', PcmCaptureProcessor);
     let apiKey = options.apiKey || '';
     if (!apiKey) {
       try {
-        apiKey = localStorage.getItem('workplace_english_gemini_api_key') || '';
+        const stored = localStorage.getItem('workplace_english_gemini_api_key');
+        if (stored && stored !== 'OFF' && stored !== 'none') {
+          apiKey = stored;
+        }
       } catch (_) {}
+    }
+    if (!apiKey && window.ExecVoice?.DEFAULT_API_KEY) {
+      apiKey = window.ExecVoice.DEFAULT_API_KEY;
     }
     const aiVoice =
       options.aiVoice ||

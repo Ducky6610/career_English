@@ -46,6 +46,65 @@
     return m;
   }
 
+  /* --------------------------------------------- rounded geometry & textures */
+  const geoCache = new Map();
+  function getRoundedBoxGeometry(w, h, d, r, bevel) {
+    const b = bevel !== undefined ? bevel : 0.05;
+    const rad = Math.min(r !== undefined ? r : 0.35, w / 2 - b - 0.01, d / 2 - b - 0.01);
+    const safeRad = Math.max(0.01, rad);
+    const key = `${w.toFixed(2)}_${h.toFixed(2)}_${d.toFixed(2)}_${safeRad.toFixed(2)}_${b.toFixed(2)}`;
+    if (geoCache.has(key)) return geoCache.get(key);
+    const shape = new T.Shape();
+    const x = -w / 2;
+    const z = -d / 2;
+    shape.moveTo(x + safeRad, z);
+    shape.lineTo(x + w - safeRad, z);
+    shape.quadraticCurveTo(x + w, z, x + w, z + safeRad);
+    shape.lineTo(x + w, z + d - safeRad);
+    shape.quadraticCurveTo(x + w, z + d, x + w - safeRad, z + d);
+    shape.lineTo(x + safeRad, z + d);
+    shape.quadraticCurveTo(x, z + d, x, z + d - safeRad);
+    shape.lineTo(x, z + safeRad);
+    shape.quadraticCurveTo(x, z, x + safeRad, z);
+    const depth = Math.max(0.02, h - b * 2);
+    const geo = new T.ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: b > 0.001,
+      bevelSegments: 2,
+      bevelSize: b,
+      bevelThickness: b
+    });
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, b, 0);
+    geoCache.set(key, geo);
+    return geo;
+  }
+
+  function roundedBox(parent, w, h, d, r, color, x, y, z, extra) {
+    const geo = getRoundedBoxGeometry(w, h, d, r);
+    const m = new T.Mesh(geo, mat(color, extra));
+    m.position.set(x, y, z);
+    parent.add(m);
+    return m;
+  }
+
+  function curvedTower(parent, w, h, d, r, wall, roof, x, y, z, opts) {
+    opts = opts || {};
+    const rad = r !== undefined ? r : 0.45;
+    const geo = getRoundedBoxGeometry(w, h, d, rad);
+    let m;
+    if (opts.glass) {
+      const tex = glassTowerTexture(opts.tint || 'blue');
+      m = new T.Mesh(geo, new T.MeshLambertMaterial({ map: tex }));
+    } else {
+      m = new T.Mesh(geo, mat(wall));
+    }
+    m.position.set(x, y, z);
+    parent.add(m);
+    roundedBox(parent, w + 0.16, 0.16, d + 0.16, rad + 0.05, roof, x, y + h, z);
+    return m;
+  }
+
   function cyl(parent, rt, rb, h, color, x, y, z, seg, extra) {
     const m = new T.Mesh(new T.CylinderGeometry(rt, rb, h, seg || 16), mat(color, extra));
     m.position.set(x, y + h / 2, z);
@@ -54,13 +113,207 @@
   }
 
   function sphere(parent, r, color, x, y, z, extra) {
-    const m = new T.Mesh(new T.SphereGeometry(r, 14, 10), mat(color, extra));
+    const m = new T.Mesh(new T.SphereGeometry(r, 16, 12), mat(color, extra));
     m.position.set(x, y, z);
     parent.add(m);
     return m;
   }
 
   const texCache = new Map();
+
+  function convenienceFasciaTexture() {
+    const key = 'tex_mart_fascia';
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = '#ffffff';
+    g.fillRect(0, 0, 256, 64);
+    g.fillStyle = '#ea580c';
+    g.fillRect(0, 4, 256, 14);
+    g.fillStyle = '#16a34a';
+    g.fillRect(0, 20, 256, 14);
+    g.fillStyle = '#0f172a';
+    g.font = 'bold 24px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('24H SIM-MART', 128, 48);
+    const tex = new T.CanvasTexture(c);
+    tex.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  function vendingMachineTexture() {
+    const key = 'tex_vending';
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#0284c7';
+    g.fillRect(0, 0, 64, 128);
+    g.fillStyle = '#ef4444';
+    g.fillRect(4, 4, 56, 20);
+    g.fillStyle = '#ffffff';
+    g.font = 'bold 12px sans-serif';
+    g.textAlign = 'center';
+    g.fillText('COLD', 32, 18);
+    g.fillStyle = '#f8fafc';
+    g.fillRect(6, 28, 52, 60);
+    const cols = ['#ef4444', '#16a34a', '#eab308', '#3b82f6'];
+    for (let r = 0; r < 3; r++) {
+      for (let cl = 0; cl < 4; cl++) {
+        g.fillStyle = cols[cl % cols.length];
+        g.fillRect(10 + cl * 12, 34 + r * 18, 8, 12);
+      }
+    }
+    g.fillStyle = '#1e293b';
+    g.fillRect(18, 96, 28, 18);
+    const tex = new T.CanvasTexture(c);
+    tex.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  function helipadTexture() {
+    const key = 'tex_helipad';
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#334155';
+    g.fillRect(0, 0, 128, 128);
+    g.strokeStyle = '#eab308';
+    g.lineWidth = 6;
+    g.beginPath();
+    g.arc(64, 64, 54, 0, Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 4;
+    g.setLineDash([8, 6]);
+    g.beginPath();
+    g.arc(64, 64, 42, 0, Math.PI * 2);
+    g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = '#ffffff';
+    g.font = 'bold 54px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('H', 64, 66);
+    const tex = new T.CanvasTexture(c);
+    tex.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  function solarPanelTexture() {
+    const key = 'tex_solar';
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = '#1e3a8a';
+    g.fillRect(0, 0, 64, 64);
+    g.strokeStyle = '#93c5fd';
+    g.lineWidth = 2;
+    for (let i = 0; i <= 64; i += 16) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 64); g.stroke();
+      g.beginPath(); g.moveTo(0, i); g.lineTo(64, i); g.stroke();
+    }
+    const tex = new T.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  function storefrontGlassTexture(type) {
+    const key = 'tex_glass_' + (type || 'store');
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 64;
+    const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 64);
+    gr.addColorStop(0, '#fef08a');
+    gr.addColorStop(0.3, '#fed7aa');
+    gr.addColorStop(1, '#64748b');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 128, 64);
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 4;
+    g.strokeRect(2, 2, 124, 60);
+    g.beginPath();
+    g.moveTo(64, 0); g.lineTo(64, 64);
+    g.moveTo(32, 0); g.lineTo(32, 64);
+    g.moveTo(96, 0); g.lineTo(96, 64);
+    g.stroke();
+    g.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    g.beginPath();
+    g.moveTo(10, 0); g.lineTo(35, 0); g.lineTo(15, 64); g.lineTo(-10, 64);
+    g.fill();
+    g.beginPath();
+    g.moveTo(70, 0); g.lineTo(95, 0); g.lineTo(75, 64); g.lineTo(50, 64);
+    g.fill();
+    const tex = new T.CanvasTexture(c);
+    tex.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  function awningTexture(c1, c2) {
+    const key = 'tex_awn_' + c1 + '_' + c2;
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 64;
+    const g = c.getContext('2d');
+    const cols = [c1 || '#ffffff', c2 || '#ef4444'];
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle = cols[i % 2];
+      g.fillRect(i * 16, 0, 16, 64);
+      g.fillStyle = 'rgba(0,0,0,0.1)';
+      g.fillRect(i * 16, 0, 2, 64);
+    }
+    const tex = new T.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, tex);
+    return tex;
+  }
+
+  function glassTowerTexture(tint) {
+    const key = 'tex_tower_' + (tint || 'blue');
+    if (texCache.has(key)) return texCache.get(key);
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 128;
+    const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 0, 128);
+    gr.addColorStop(0, '#7dd3fc');
+    gr.addColorStop(0.45, '#38bdf8');
+    gr.addColorStop(0.55, '#0284c7');
+    gr.addColorStop(1, '#075985');
+    g.fillStyle = gr;
+    g.fillRect(0, 0, 128, 128);
+    g.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    g.lineWidth = 2;
+    for (let y = 0; y < 128; y += 32) {
+      g.beginPath(); g.moveTo(0, y); g.lineTo(128, y); g.stroke();
+    }
+    for (let x = 0; x < 128; x += 32) {
+      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 128); g.stroke();
+    }
+    g.fillStyle = '#fef08a';
+    g.fillRect(6, 6, 20, 20);
+    g.fillRect(70, 38, 20, 20);
+    g.fillRect(38, 70, 20, 20);
+    g.fillRect(102, 102, 20, 20);
+    const tex = new T.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = T.RepeatWrapping;
+    tex.colorSpace = T.SRGBColorSpace;
+    tex.anisotropy = 4;
+    texCache.set(key, tex);
+    return tex;
+  }
+
   function wallTexture(wall, glass) {
     const key = wall + (glass ? 'g' : '');
     if (texCache.has(key)) return texCache.get(key);
@@ -274,100 +527,27 @@
     }
   }
 
-  /* -------------------------------------------------------- building models */
+  /* -------------------------------------------------------- SimCity building models */
   const CRATE = '#c08a4a';
 
-  function buildConstruction(g, accent) {
-    box(g, 5.2, 0.2, 4.6, '#78716c', 0, 0, 0);
-    [[-2.4, -2.1], [2.4, -2.1], [-2.4, 2.1], [2.4, 2.1]].forEach(([x, z]) =>
-      box(g, 0.18, 1.3, 0.18, '#facc15', x, 0.2, z)
-    );
-    box(g, 4.8, 0.14, 0.1, '#f97316', 0, 0.9, 2.1);
-    box(g, 4.8, 0.14, 0.1, '#f97316', 0, 0.5, 2.1);
-    box(g, 4.8, 0.14, 0.1, '#f97316', 0, 0.9, -2.1);
-    box(g, 0.1, 0.14, 4.2, '#f97316', 2.4, 0.9, 0);
-    box(g, 0.1, 0.14, 4.2, '#f97316', -2.4, 0.9, 0);
-    box(g, 1.1, 0.6, 1.1, CRATE, -1.3, 0.2, 0.8);
-    box(g, 0.9, 0.5, 0.9, CRATE, -0.5, 0.2, 1.3);
-    box(g, 1.0, 0.5, 1.0, '#a16207', -1.2, 0.8, 0.9);
-    cyl(g, 0, 0.28, 0.6, '#f97316', 1.2, 0.2, 1.2, 10);
-    cyl(g, 0, 0.28, 0.6, '#f97316', 1.7, 0.2, 0.5, 10);
-    // crane
-    box(g, 0.3, 4.6, 0.3, '#eab308', 1.5, 0.2, -1.2);
-    const jib = new T.Group();
-    jib.position.set(1.5, 4.9, -1.2);
-    box(jib, 4.4, 0.22, 0.22, '#eab308', -1.0, 0, 0);
-    box(jib, 0.9, 0.5, 0.5, '#57534e', 1.5, -0.1, 0);
-    box(jib, 0.04, 1.4, 0.04, '#1f2937', -2.4, -1.4, 0);
-    box(jib, 0.4, 0.3, 0.4, '#ef4444', -2.4, -1.7, 0);
-    g.add(jib);
-    g.userData.spin = jib;
-    box(g, 0.5, 0.35, 0.5, accent, -1.9, 0.2, -1.5);
-  }
-
-  function buildShop(g, c) {
-    tower(g, 4.2, 2.6, 3.6, c.wall, c.roof, 0, 0, -0.3, {});
-    for (let i = 0; i < 6; i++) {
-      box(g, 0.72, 0.12, 1.1, i % 2 ? '#ffffff' : c.roof, -1.8 + i * 0.72 + 0.36, 1.85, 2.0);
-    }
-    box(g, 0.85, 1.5, 0.08, '#5b3a1e', 0, 0, 1.52);
-    box(g, 2.6, 0.75, 0.22, c.roof, 0, 2.6, 0.2);
-    sphere(g, 0.32, '#22c55e', -1.9, 0.5, 2.1);
-    sphere(g, 0.32, '#22c55e', 1.9, 0.5, 2.1);
-    cyl(g, 0.22, 0.18, 0.3, '#b45309', -1.9, 0, 2.1, 10);
-    cyl(g, 0.22, 0.18, 0.3, '#b45309', 1.9, 0, 2.1, 10);
-  }
-
-  function buildMidrise(g, c) {
-    tower(g, 5.0, 1.8, 4.6, c.wall, c.roof, 0, 0, 0, {});
-    tower(g, 3.6, 5.2, 3.4, '#2f6f9f', c.roof, 0, 1.8, 0, { glass: true });
-    box(g, 2.4, 0.16, 1.4, '#ffffff', 0, 1.5, 2.9);
-    box(g, 0.14, 1.5, 0.14, '#cbd5e1', -1.1, 0, 3.4);
-    box(g, 0.14, 1.5, 0.14, '#cbd5e1', 1.1, 0, 3.4);
-    box(g, 1.2, 0.55, 1.2, '#94a3b8', 0.7, 7.0, 0.2);
-    box(g, 0.8, 0.35, 0.8, '#64748b', -0.8, 7.0, -0.6);
-    cyl(g, 0.9, 0.9, 0.08, '#475569', -0.5, 7.0, 0.7, 20);
-    sphere(g, 0.35, '#22c55e', -2.3, 0.4, 2.6);
-    sphere(g, 0.35, '#22c55e', 2.3, 0.4, 2.6);
-  }
-
-  function buildSkyscraper(g, c) {
-    const gold = '#d9a21b';
-    tower(g, 5.4, 1.8, 5.0, c.wall, c.roof, 0, 0, 0, {});
-    tower(g, 4.0, 5.5, 3.8, gold, '#fde047', 0, 1.8, 0, { floorH: 1.3 });
-    tower(g, 2.8, 2.4, 2.7, gold, '#fde047', 0, 7.3, 0, { floorH: 1.2 });
-    const crown = new T.Mesh(new T.ConeGeometry(1.7, 1.6, 4), mat('#fde047', { emissive: '#a16207', emissiveIntensity: 0.5 }));
-    crown.rotation.y = Math.PI / 4;
-    crown.position.y = 10.5;
-    g.add(crown);
-    cyl(g, 0.05, 0.07, 2.4, '#e5e7eb', 0, 11.2, 0, 6);
-    const beacon = sphere(g, 0.2, '#ef4444', 0, 13.6, 0, { emissive: '#ef4444', emissiveIntensity: 1 });
-    g.userData.beacon = beacon;
-    const ring = new T.Mesh(new T.TorusGeometry(3.5, 0.08, 8, 40), new T.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.8 }));
-    ring.rotation.x = Math.PI / 2;
-    ring.position.y = 0.15;
-    g.add(ring);
-    g.userData.glow = ring;
-    box(g, 0.3, 4.0, 0.3, '#fbbf24', 2.9, 0, 2.7);
-    box(g, 0.3, 4.0, 0.3, '#fbbf24', -2.9, 0, 2.7);
-  }
-
-  function buildTree(parent, x, z, s) {
+  function buildSoftTree(parent, x, z, s) {
     const g = new T.Group();
-    cyl(g, 0.14 * s, 0.2 * s, 0.9 * s, '#7c4a1e', 0, 0, 0, 6);
-    const crown = new T.Mesh(new T.ConeGeometry(0.85 * s, 1.5 * s, 7), mat('#2f9e44'));
-    crown.position.y = 1.5 * s;
-    g.add(crown);
-    const crown2 = new T.Mesh(new T.ConeGeometry(0.65 * s, 1.2 * s, 7), mat('#37b24d'));
-    crown2.position.y = 2.2 * s;
-    g.add(crown2);
+    cyl(g, 0.12 * s, 0.18 * s, 0.8 * s, '#6e4726', 0, 0, 0, 10);
+    const m1 = sphere(g, 0.85 * s, '#2f9e44', 0, 1.4 * s, 0);
+    m1.scale.set(1.15, 0.88, 1.15);
+    const m2 = sphere(g, 0.62 * s, '#37b24d', 0, 2.05 * s, 0);
+    m2.scale.set(0.95, 0.85, 0.95);
+    const m3 = sphere(g, 0.42 * s, '#40c057', 0, 2.55 * s, 0);
     g.position.set(x, 0, z);
     g.traverse((o) => (o.castShadow = true));
     parent.add(g);
     return g;
   }
+  const buildTree = buildSoftTree;
 
   function questionTexture() {
+    const key = 'tex_question';
+    if (texCache.has(key)) return texCache.get(key);
     const c = document.createElement('canvas');
     c.width = c.height = 128;
     const g = c.getContext('2d');
@@ -376,7 +556,7 @@
     gr.addColorStop(1, '#f59e0b');
     g.fillStyle = gr;
     g.fillRect(0, 0, 128, 128);
-    g.strokeStyle = '#fff';
+    g.strokeStyle = '#ffffff';
     g.lineWidth = 8;
     g.strokeRect(6, 6, 116, 116);
     g.fillStyle = '#7c2d12';
@@ -386,47 +566,268 @@
     g.fillText('?', 64, 70);
     const t = new T.CanvasTexture(c);
     t.colorSpace = T.SRGBColorSpace;
+    texCache.set(key, t);
     return t;
+  }
+
+  function buildConstruction(g, accent) {
+    roundedBox(g, 5.0, 0.15, 4.4, 0.45, '#78716c', 0, 0, 0);
+    roundedBox(g, 4.8, 0.8, 0.1, 0.05, '#facc15', 0, 0.15, 2.05);
+    box(g, 4.8, 0.18, 0.12, '#ea580c', 0, 0.45, 2.05);
+    roundedBox(g, 0.1, 0.8, 4.0, 0.05, '#facc15', 2.35, 0.15, 0);
+    roundedBox(g, 0.1, 0.8, 4.0, 0.05, '#facc15', -2.35, 0.15, 0);
+    const ex = new T.Group();
+    ex.position.set(-1.2, 0.15, 0.8);
+    roundedBox(ex, 1.3, 0.28, 0.9, 0.12, '#1e293b', 0, 0, 0);
+    roundedBox(ex, 0.9, 0.75, 0.7, 0.18, '#eab308', -0.1, 0.28, 0);
+    box(ex, 0.45, 0.4, 0.5, '#0284c7', 0.15, 0.45, 0, { transparent: true, opacity: 0.85 });
+    const boom = box(ex, 1.4, 0.15, 0.15, '#eab308', 0.8, 0.55, 0);
+    boom.rotation.z = -0.35;
+    g.add(ex);
+    cyl(g, 0.32, 0.32, 1.4, '#94a3b8', 1.2, 0.32, 1.1, 16).rotation.z = Math.PI / 2;
+    cyl(g, 0.32, 0.32, 1.4, '#94a3b8', 1.2, 0.32, 0.4, 16).rotation.z = Math.PI / 2;
+    cyl(g, 0.32, 0.32, 1.4, '#94a3b8', 1.2, 0.85, 0.75, 16).rotation.z = Math.PI / 2;
+    cyl(g, 0.05, 0.05, 1.8, '#78350f', -1.7, 0.15, -1.2, 8);
+    cyl(g, 0.05, 0.05, 1.8, '#78350f', -0.7, 0.15, -1.2, 8);
+    const sign = roundedBox(g, 1.3, 0.9, 0.08, 0.1, '#0284c7', -1.2, 1.1, -1.2);
+    box(sign, 1.15, 0.75, 0.02, '#e0f2fe', 0, 0.45, 0.04);
+    box(g, 0.32, 4.6, 0.32, '#eab308', 1.5, 0.15, -1.2);
+    const jib = new T.Group();
+    jib.position.set(1.5, 4.85, -1.2);
+    box(jib, 4.4, 0.22, 0.22, '#eab308', -1.0, 0, 0);
+    box(jib, 0.9, 0.5, 0.5, '#475569', 1.5, -0.1, 0);
+    box(jib, 0.04, 1.4, 0.04, '#1f2937', -2.4, -1.4, 0);
+    box(jib, 0.4, 0.3, 0.4, '#ef4444', -2.4, -1.7, 0);
+    g.add(jib);
+    g.userData.spin = jib;
+  }
+
+  function buildConvenienceStore(g, c, lv) {
+    if (lv <= 0) {
+      buildConstruction(g, '#16a34a');
+      return;
+    }
+    if (lv === 1) {
+      box(g, 4.8, 0.04, 1.8, '#334155', 0, 0, 1.7);
+      for (let i = -1; i <= 1; i += 2) {
+        box(g, 0.08, 0.05, 1.4, '#ffffff', i * 1.3, 0.02, 1.7);
+        roundedBox(g, 0.9, 0.12, 0.16, 0.06, '#facc15', i * 1.3, 0.04, 1.05);
+      }
+      roundedBox(g, 4.4, 2.4, 3.2, 0.4, '#f8fafc', 0, 0, -0.6);
+      const fascia = box(g, 4.5, 0.65, 0.35, '#ffffff', 0, 2.05, 0.95);
+      fascia.material = new T.MeshLambertMaterial({ map: convenienceFasciaTexture() });
+      const glassFront = box(g, 3.8, 1.7, 0.05, '#ffffff', 0, 0.1, 0.98);
+      glassFront.material = new T.MeshLambertMaterial({ map: storefrontGlassTexture('mart') });
+      const vm = roundedBox(g, 0.7, 1.5, 0.6, 0.08, '#0284c7', 2.4, 0, 0.8);
+      vm.material = new T.MeshLambertMaterial({ map: vendingMachineTexture() });
+      cyl(g, 0.18, 0.16, 0.6, '#16a34a', -2.3, 0, 1.8, 14);
+      cyl(g, 0.18, 0.16, 0.6, '#0284c7', -2.6, 0, 1.8, 14);
+      cyl(g, 0.08, 0.08, 3.6, '#cbd5e1', -2.2, 0, 2.2, 12);
+      const signHead = roundedBox(g, 0.85, 0.75, 0.25, 0.15, '#ea580c', -2.2, 3.6, 2.2);
+      signHead.material = new T.MeshLambertMaterial({ map: convenienceFasciaTexture() });
+      roundedBox(g, 1.0, 0.6, 0.8, 0.1, '#94a3b8', -1.2, 2.4, -0.6);
+      cyl(g, 0.25, 0.25, 0.15, '#475569', -1.2, 3.0, -0.6, 16);
+      return;
+    }
+    if (lv === 2) {
+      roundedBox(g, 5.0, 2.2, 4.4, 0.45, '#f8fafc', 0, 0, 0);
+      box(g, 5.0, 0.04, 1.4, '#334155', 0, 0, 2.6);
+      const fascia = box(g, 5.1, 0.7, 0.35, '#ffffff', 0, 1.85, 2.15);
+      fascia.material = new T.MeshLambertMaterial({ map: convenienceFasciaTexture() });
+      const glassFront = box(g, 4.2, 1.5, 0.05, '#ffffff', 0, 0.1, 2.18);
+      glassFront.material = new T.MeshLambertMaterial({ map: storefrontGlassTexture('mart') });
+      curvedTower(g, 4.2, 3.2, 3.6, 0.45, '#f8fafc', '#e2e8f0', 0, 2.2, -0.3, { glass: true });
+      box(g, 4.2, 0.4, 0.06, '#94a3b8', 0, 2.2, 1.7);
+      buildSoftTree(g, -2.4, 2.6, 0.7);
+      buildSoftTree(g, 2.4, 2.6, 0.7);
+      const vm = roundedBox(g, 0.7, 1.5, 0.6, 0.08, '#0284c7', 2.3, 0, 2.6);
+      vm.material = new T.MeshLambertMaterial({ map: vendingMachineTexture() });
+      roundedBox(g, 1.4, 0.7, 1.2, 0.12, '#64748b', -0.8, 5.4, -0.4);
+      cyl(g, 0.35, 0.35, 0.2, '#334155', -0.8, 6.1, -0.4, 16);
+      return;
+    }
+    buildSkyscraperWithRetail(g, c, convenienceFasciaTexture(), 'mart');
+  }
+
+  function buildCafeBoba(g, c, lv, isBoba) {
+    if (lv <= 0) {
+      buildConstruction(g, c.roof);
+      return;
+    }
+    const wood = isBoba ? '#1e3a8a' : '#78350f';
+    const accent = isBoba ? '#0284c7' : '#d97706';
+    if (lv === 1) {
+      roundedBox(g, 4.8, 0.08, 1.8, 0.2, '#b45309', 0, 0, 1.7);
+      roundedBox(g, 4.4, 2.6, 3.4, 0.4, wood, 0, 0, -0.5);
+      const awn = box(g, 4.2, 0.28, 1.2, '#ffffff', 0, 2.15, 1.45);
+      awn.rotation.x = 0.22;
+      awn.material = new T.MeshLambertMaterial({ map: awningTexture('#ffffff', accent) });
+      const glassFront = box(g, 3.6, 1.6, 0.05, '#ffffff', 0, 0.1, 1.18);
+      glassFront.material = new T.MeshLambertMaterial({ map: storefrontGlassTexture('cafe') });
+      const logo = cyl(g, 0.5, 0.5, 0.08, '#ffffff', 0, 2.7, 1.2, 24);
+      logo.rotation.x = Math.PI / 2;
+      cyl(g, 0.42, 0.42, 0.09, accent, 0, 2.7, 1.22, 24).rotation.x = Math.PI / 2;
+      cyl(g, 0.04, 0.04, 2.0, '#cbd5e1', -1.5, 0.08, 1.7, 8);
+      cyl(g, 0, 1.1, 0.42, accent, -1.5, 1.95, 1.7, 18);
+      cyl(g, 0.35, 0.35, 0.65, '#94a3b8', -1.5, 0.08, 1.7, 14);
+      cyl(g, 0.18, 0.18, 0.35, '#78350f', -1.9, 0.08, 1.7, 10);
+      cyl(g, 0.18, 0.18, 0.35, '#78350f', -1.1, 0.08, 1.7, 10);
+      roundedBox(g, 1.4, 0.35, 0.4, 0.1, '#16a34a', 1.5, 0.08, 1.8);
+      return;
+    }
+    if (lv === 2) {
+      roundedBox(g, 5.0, 2.2, 4.6, 0.45, wood, 0, 0, 0);
+      curvedTower(g, 4.0, 2.8, 3.4, 0.4, '#ffffff', accent, 0, 2.2, -0.4, { glass: true });
+      roundedBox(g, 4.8, 0.08, 1.6, 0.15, '#b45309', 0, 2.2, 1.6);
+      box(g, 4.8, 0.4, 0.06, '#94a3b8', 0, 2.25, 2.38);
+      cyl(g, 0.04, 0.04, 1.8, '#cbd5e1', 1.3, 2.28, 1.6, 8);
+      cyl(g, 0, 0.9, 0.4, accent, 1.3, 3.8, 1.6, 16);
+      buildSoftTree(g, -2.4, 2.4, 0.7);
+      return;
+    }
+    buildSkyscraperWithRetail(g, c, null, isBoba ? 'boba' : 'cafe');
+  }
+
+  function buildSkyscraperWithRetail(g, c, fasciaTex, type) {
+    const gold = '#d9a21b';
+    curvedTower(g, 5.4, 2.4, 5.0, 0.55, c.wall, c.roof, 0, 0, 0, {});
+    if (fasciaTex) {
+      const f = box(g, 4.8, 0.7, 0.3, '#ffffff', 0, 1.9, 2.45);
+      f.material = new T.MeshLambertMaterial({ map: fasciaTex });
+    } else {
+      box(g, 3.2, 0.14, 1.4, '#ffffff', 0, 1.8, 2.6);
+      cyl(g, 0.14, 0.14, 1.8, '#cbd5e1', -1.3, 0, 3.1, 12);
+      cyl(g, 0.14, 0.14, 1.8, '#cbd5e1', 1.3, 0, 3.1, 12);
+    }
+    curvedTower(g, 4.2, 5.4, 4.0, 0.5, '#0284c7', '#38bdf8', 0, 2.4, 0, { glass: true });
+    curvedTower(g, 3.2, 3.6, 3.0, 0.45, gold, '#fde047', 0, 7.8, 0, { glass: true });
+    const heli = box(g, 2.2, 0.08, 2.2, '#334155', 0, 11.4, 0);
+    heli.material = new T.MeshLambertMaterial({ map: helipadTexture() });
+    cyl(g, 0.06, 0.1, 2.6, '#e2e8f0', 0, 11.48, 0, 12);
+    const beacon = sphere(g, 0.22, '#ef4444', 0, 14.1, 0, { emissive: '#ef4444', emissiveIntensity: 1 });
+    g.userData.beacon = beacon;
+    const ring = new T.Mesh(new T.TorusGeometry(3.6, 0.08, 8, 48), new T.MeshBasicMaterial({ color: '#fde047', transparent: true, opacity: 0.85 }));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.15;
+    g.add(ring);
+    g.userData.glow = ring;
+  }
+
+  function buildCommercialTower(g, c, lv, tile) {
+    if (lv <= 0) {
+      buildConstruction(g, c.roof);
+      return;
+    }
+    if (lv === 1) {
+      curvedTower(g, 4.6, 3.2, 3.8, 0.45, c.wall, c.roof, 0, 0, 0, { glass: true });
+      box(g, 2.6, 0.14, 1.4, '#e0f2fe', 0, 1.7, 2.2);
+      cyl(g, 0.14, 0.14, 1.7, '#cbd5e1', -1.1, 0, 2.7, 12);
+      cyl(g, 0.14, 0.14, 1.7, '#cbd5e1', 1.1, 0, 2.7, 12);
+      cyl(g, 0.65, 0.65, 1.3, '#0284c7', 0, 0.1, 1.9, 16, { transparent: true, opacity: 0.85 });
+      buildSoftTree(g, -2.4, 2.4, 0.7);
+      buildSoftTree(g, 2.4, 2.4, 0.7);
+      return;
+    }
+    if (lv === 2) {
+      curvedTower(g, 5.2, 2.0, 4.8, 0.5, c.wall, c.roof, 0, 0, 0, {});
+      curvedTower(g, 4.4, 5.4, 4.0, 0.45, '#0284c7', c.roof, 0, 2.0, 0, { glass: true });
+      box(g, 2.8, 0.16, 1.5, '#ffffff', 0, 1.7, 2.8);
+      cyl(g, 0.15, 0.15, 1.7, '#cbd5e1', -1.2, 0, 3.3, 12);
+      cyl(g, 0.15, 0.15, 1.7, '#cbd5e1', 1.2, 0, 3.3, 12);
+      roundedBox(g, 1.4, 0.75, 1.2, 0.12, '#64748b', -0.8, 7.4, 0);
+      cyl(g, 0.35, 0.35, 0.2, '#334155', -0.8, 8.15, 0, 16);
+      const dish = new T.Mesh(new T.SphereGeometry(0.65, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat('#e2e8f0'));
+      dish.rotation.x = Math.PI / 3;
+      dish.position.set(1.0, 7.5, -0.6);
+      g.add(dish);
+      buildSoftTree(g, -2.5, 2.6, 0.8);
+      buildSoftTree(g, 2.5, 2.6, 0.8);
+      return;
+    }
+    buildSkyscraperWithRetail(g, c, null, 'office');
+  }
+
+  function buildTechPark(g, c, lv) {
+    if (lv <= 0) {
+      buildConstruction(g, '#8b5cf6');
+      return;
+    }
+    if (lv === 1) {
+      curvedTower(g, 4.6, 2.8, 3.6, 0.4, '#1e293b', '#06b6d4', 0, 0, 0, { glass: true });
+      const sol = box(g, 3.2, 0.08, 1.6, '#1e3a8a', 0, 2.85, -0.2);
+      sol.rotation.x = -0.25;
+      sol.material = new T.MeshLambertMaterial({ map: solarPanelTexture() });
+      roundedBox(g, 0.35, 0.85, 0.25, 0.08, '#ffffff', 2.0, 0, 1.8);
+      box(g, 0.25, 0.25, 0.05, '#10b981', 2.0, 0.5, 1.95, { emissive: '#10b981', emissiveIntensity: 0.8 });
+      buildSoftTree(g, -2.2, 2.0, 0.7);
+      return;
+    }
+    if (lv === 2) {
+      curvedTower(g, 2.4, 4.2, 3.8, 0.4, '#0f172a', '#06b6d4', -1.3, 0, 0, { glass: true });
+      curvedTower(g, 2.4, 3.4, 3.8, 0.4, '#1e293b', '#06b6d4', 1.3, 0, 0, { glass: true });
+      roundedBox(g, 1.2, 1.0, 1.8, 0.25, '#38bdf8', 0, 2.1, 0, { transparent: true, opacity: 0.88 });
+      const sol = box(g, 2.0, 0.08, 2.6, '#1e3a8a', 1.3, 3.45, 0);
+      sol.rotation.x = -0.2;
+      sol.material = new T.MeshLambertMaterial({ map: solarPanelTexture() });
+      buildSoftTree(g, 0, 2.4, 0.8);
+      return;
+    }
+    buildSkyscraperWithRetail(g, c, null, 'tech');
+  }
+
+  function buildShop(g, c) {
+    buildCafeBoba(g, c, 1, false);
+  }
+
+  function buildMidrise(g, c) {
+    buildCommercialTower(g, c, 2, {});
+  }
+
+  function buildSkyscraper(g, c) {
+    buildCommercialTower(g, c, 3, {});
   }
 
   function buildSpecial(g, tile) {
     const accent = tile.zoneColor || '#64748b';
     switch (tile.type) {
       case 'corner-start': {
-        box(g, 4.8, 0.3, 3.8, '#e7e0cc', 0, 0, 0);
-        tower(g, 4.4, 2.2, 3.4, '#f5efe0', '#d9cfae', 0, 0.3, 0, { floorH: 2 });
-        for (let i = 0; i < 4; i++) cyl(g, 0.17, 0.17, 2.2, '#fffaf0', -1.5 + i, 0.3, 1.85, 10);
+        roundedBox(g, 5.0, 0.25, 4.0, 0.45, '#e7e0cc', 0, 0, 0);
+        roundedBox(g, 4.4, 2.2, 3.2, 0.35, '#f5efe0', 0, 0.25, -0.2);
+        for (let i = 0; i < 4; i++) {
+          cyl(g, 0.16, 0.16, 2.2, '#fffaf0', -1.5 + i * 1.0, 0.25, 1.45, 16);
+        }
         const ped = new T.Mesh(new T.ConeGeometry(2.6, 0.9, 3), mat('#d9cfae'));
-        ped.rotation.set(Math.PI / 2, 0, Math.PI);
-        ped.rotation.order = 'YXZ';
-        ped.position.set(0, 2.9, 1.7);
+        ped.position.set(0, 2.9, 1.45);
         ped.scale.set(1, 0.3, 1);
-        ped.rotation.set(0, 0, 0);
         g.add(ped);
-        const dome = new T.Mesh(new T.SphereGeometry(1.15, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat('#14b8a6'));
-        dome.position.set(0, 2.5, -0.2);
+        const dome = new T.Mesh(new T.SphereGeometry(1.2, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2), mat('#0d9488'));
+        dome.position.set(0, 2.45, -0.2);
         g.add(dome);
-        cyl(g, 0.05, 0.05, 1.6, '#e5e7eb', 0, 3.6, -0.2, 6);
-        const flag = box(g, 0.9, 0.5, 0.05, '#ef4444', 0.45, 4.7, -0.2);
+        cyl(g, 0.06, 0.06, 1.8, '#f59e0b', 0, 3.65, -0.2, 8);
+        const flag = box(g, 0.9, 0.5, 0.05, '#ef4444', 0.45, 4.8, -0.2);
         g.userData.flag = flag;
         break;
       }
       case 'chance': {
         if (tile.icon === '📺') {
-          box(g, 4.2, 0.4, 3.4, '#475569', 0, 0, 0);
-          box(g, 0.4, 5.0, 0.4, '#94a3b8', -1.3, 0.4, -0.5);
-          const screen = box(g, 3.0, 1.9, 0.3, '#0f172a', 0, 2.6, 0.4);
-          const sc = box(g, 2.7, 1.6, 0.06, '#ec4899', 0, 2.75, 0.58, { emissive: '#ec4899', emissiveIntensity: 0.9 });
+          roundedBox(g, 4.4, 0.4, 3.6, 0.4, '#334155', 0, 0, 0);
+          curvedTower(g, 3.6, 3.8, 3.0, 0.4, '#1e293b', '#ec4899', 0, 0.4, -0.2, { glass: true });
+          const sc = roundedBox(g, 3.2, 1.8, 0.25, 0.15, '#ec4899', 0, 2.2, 1.4, { emissive: '#ec4899', emissiveIntensity: 0.9 });
           g.userData.screen = sc;
-          box(g, 0.3, 2.2, 0.3, '#64748b', 0, 0.4, 0.3);
-          const dish = new T.Mesh(new T.SphereGeometry(0.7, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat('#e5e7eb'));
-          dish.rotation.x = Math.PI / 3;
-          dish.position.set(-1.3, 5.6, -0.2);
-          g.add(dish);
+          const dish1 = new T.Mesh(new T.SphereGeometry(0.65, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat('#e2e8f0'));
+          dish1.rotation.x = Math.PI / 3;
+          dish1.position.set(-1.0, 4.3, 0);
+          g.add(dish1);
+          const dish2 = new T.Mesh(new T.SphereGeometry(0.5, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat('#e2e8f0'));
+          dish2.rotation.x = Math.PI / 4;
+          dish2.position.set(1.0, 4.3, -0.5);
+          g.add(dish2);
+          cyl(g, 0.05, 0.08, 2.2, '#94a3b8', 0, 4.2, 0, 8);
+          sphere(g, 0.15, '#ef4444', 0, 6.4, 0, { emissive: '#ef4444', emissiveIntensity: 1 });
         } else {
-          cyl(g, 1.9, 2.1, 0.4, accent, 0, 0, 0, 24);
-          cyl(g, 1.3, 1.5, 0.5, '#fff7ed', 0, 0.4, 0, 24);
-          const q = new T.Mesh(new T.BoxGeometry(1.7, 1.7, 1.7), new T.MeshLambertMaterial({ map: questionTexture(), emissive: '#f59e0b', emissiveIntensity: 0.35 }));
+          cyl(g, 1.9, 2.1, 0.4, accent, 0, 0, 0, 32);
+          cyl(g, 1.3, 1.5, 0.45, '#fff7ed', 0, 0.4, 0, 32);
+          const q = new T.Mesh(new T.BoxGeometry(1.7, 1.7, 1.7), new T.MeshLambertMaterial({ map: questionTexture(), emissive: '#f59e0b', emissiveIntensity: 0.4 }));
           q.position.y = 2.2;
           q.castShadow = true;
           g.add(q);
@@ -436,67 +837,52 @@
         break;
       }
       case 'corner-transit': {
-        box(g, 5.2, 0.3, 4.0, '#64748b', 0, 0, 0);
-        tower(g, 4.6, 1.8, 2.2, '#c7d2e0', '#e2e8f0', 0, 0.3, -1.0, { floorH: 1.8 });
-        box(g, 5.0, 0.18, 2.0, accent, 0, 2.3, 0.1);
-        [-2.2, 2.2].forEach((x) => box(g, 0.16, 2.0, 0.16, '#94a3b8', x, 0.3, 1.0));
-        box(g, 5.0, 0.08, 0.14, '#1f2937', 0, 0.3, 1.5);
-        box(g, 5.0, 0.08, 0.14, '#1f2937', 0, 0.3, 1.9);
+        roundedBox(g, 5.2, 0.25, 4.2, 0.4, '#475569', 0, 0, 0);
+        const arch = new T.Mesh(new T.CylinderGeometry(2.2, 2.2, 4.8, 24, 1, true, 0, Math.PI), mat('#38bdf8', { transparent: true, opacity: 0.6 }));
+        arch.rotation.z = Math.PI / 2;
+        arch.position.set(0, 1.8, -0.4);
+        g.add(arch);
+        box(g, 5.0, 0.15, 1.8, '#cbd5e1', 0, 0.25, 1.0);
+        box(g, 5.0, 0.05, 0.12, '#eab308', 0, 0.4, 0.15);
         const train = new T.Group();
         for (let i = 0; i < 3; i++) {
-          box(train, 1.3, 0.9, 0.85, i === 0 ? accent : '#e2e8f0', i * 1.4 - 1.4, 0.35, 0);
-          box(train, 1.0, 0.3, 0.05, '#7dd3fc', i * 1.4 - 1.4, 0.7, 0.44);
+          roundedBox(train, 1.4, 0.9, 0.85, 0.18, i === 0 ? '#0284c7' : '#e2e8f0', i * 1.5 - 1.5, 0.35, 0.9);
+          box(train, 1.1, 0.25, 0.06, '#7dd3fc', i * 1.5 - 1.5, 0.7, 1.34);
         }
-        train.position.set(0, 0.1, 1.7);
         g.add(train);
         g.userData.train = train;
         break;
       }
       case 'corner-park': {
-        cyl(g, 2.0, 2.2, 0.35, '#cbd5e1', 0, 0, 0.2, 28);
-        cyl(g, 1.75, 1.75, 0.3, '#38bdf8', 0, 0.2, 0.2, 28, { transparent: true, opacity: 0.85 });
-        cyl(g, 0.35, 0.5, 0.9, '#e2e8f0', 0, 0.2, 0.2, 14);
-        const jet = cyl(g, 0.09, 0.09, 1.6, '#bae6fd', 0, 1.1, 0.2, 8, { transparent: true, opacity: 0.8 });
+        cyl(g, 2.2, 2.4, 0.35, '#e2e8f0', 0, 0, 0.2, 32);
+        cyl(g, 1.95, 1.95, 0.3, '#38bdf8', 0, 0.2, 0.2, 32, { transparent: true, opacity: 0.88 });
+        cyl(g, 0.7, 0.8, 0.65, '#cbd5e1', 0, 0.3, 0.2, 20);
+        const jet = cyl(g, 0.12, 0.12, 1.8, '#bae6fd', 0, 1.1, 0.2, 12, { transparent: true, opacity: 0.85 });
         g.userData.jet = jet;
-        buildTree(g, -2.2, -1.8, 1.0);
-        buildTree(g, 2.2, -1.9, 0.9);
-        buildTree(g, -2.3, 2.0, 0.8);
-        box(g, 1.1, 0.12, 0.35, '#8b5a2b', 2.2, 0.3, 2.0);
-        box(g, 1.1, 0.4, 0.08, '#8b5a2b', 2.2, 0.45, 1.85);
+        buildSoftTree(g, -2.2, -1.8, 1.0);
+        buildSoftTree(g, 2.2, -1.9, 0.9);
+        buildSoftTree(g, -2.3, 2.0, 0.85);
+        roundedBox(g, 1.2, 0.14, 0.4, 0.08, '#8b5a2b', 2.2, 0.3, 2.0);
         break;
       }
       case 'corner-builder': {
-        tower(g, 4.4, 2.6, 3.6, '#7c5cc4', '#c4b5fd', 0, 0, -0.4, { floorH: 2.4 });
-        box(g, 4.8, 0.3, 4.0, '#e9d5ff', 0, 0, -0.4);
-        cyl(g, 0.9, 0.5, 0.9, '#facc15', 0, 3.2, 1.2, 20, { emissive: '#a16207', emissiveIntensity: 0.5 });
-        cyl(g, 0.12, 0.12, 0.5, '#facc15', 0, 2.8, 1.2, 8);
-        cyl(g, 0.6, 0.6, 0.3, '#a16207', 0, 2.5, 1.2, 16);
-        const h1 = new T.Mesh(new T.TorusGeometry(0.4, 0.08, 6, 14), mat('#facc15'));
-        h1.position.set(-0.95, 3.7, 1.2);
-        g.add(h1);
-        const h2 = h1.clone();
-        h2.position.x = 0.95;
-        g.add(h2);
-        g.userData.spin = null;
-        g.userData.bob = null;
+        roundedBox(g, 5.0, 0.25, 4.2, 0.45, '#e9d5ff', 0, 0, 0);
+        curvedTower(g, 4.4, 2.8, 3.4, 0.45, '#7c3aed', '#c4b5fd', 0, 0.25, -0.3, { glass: true });
+        cyl(g, 0.6, 0.7, 0.4, '#a16207', 0, 2.5, 1.1, 20);
+        cyl(g, 0.15, 0.15, 0.6, '#facc15', 0, 2.9, 1.1, 10);
+        cyl(g, 0.7, 0.4, 0.9, '#facc15', 0, 3.4, 1.1, 20, { emissive: '#ca8a04', emissiveIntensity: 0.5 });
         break;
       }
       case 'academy': {
-        tower(g, 4.6, 2.4, 3.4, '#b5651d', '#7c2d12', 0, 0, 0, { floorH: 2.2 });
-        tower(g, 1.2, 4.2, 1.2, '#c97b2e', '#7c2d12', -1.5, 0, 1.3, { floorH: 2 });
-        const roofC = new T.Mesh(new T.ConeGeometry(0.95, 1.1, 4), mat('#7c2d12'));
-        roofC.rotation.y = Math.PI / 4;
-        roofC.position.set(-1.5, 4.75, 1.3);
-        g.add(roofC);
-        cyl(g, 0.4, 0.4, 0.06, '#ffffff', -1.5, 3.2, 1.93, 20).rotation.x = Math.PI / 2;
-        box(g, 2.0, 0.2, 2.0, '#111827', 1.1, 2.4, 0);
-        box(g, 0.9, 0.35, 0.9, '#111827', 1.1, 2.1, 0);
-        box(g, 0.06, 0.6, 0.06, '#facc15', 2.0, 1.9, 0);
-        box(g, 1.2, 0.8, 0.06, '#5b3a1e', 0.8, 0, 1.72);
+        roundedBox(g, 4.8, 0.25, 3.8, 0.4, '#f5efe0', 0, 0, 0);
+        curvedTower(g, 4.4, 2.6, 3.2, 0.4, '#b45309', '#78350f', 0, 0.25, -0.2, { glass: true });
+        curvedTower(g, 1.3, 4.4, 1.3, 0.2, '#9a3412', '#78350f', -1.5, 0.25, 1.1, {});
+        cyl(g, 0.38, 0.38, 0.08, '#ffffff', -1.5, 3.6, 1.78, 24).rotation.x = Math.PI / 2;
+        box(g, 1.8, 0.15, 1.8, '#1e293b', 1.1, 2.85, 0);
         break;
       }
       default:
-        box(g, 4, 0.4, 4, accent, 0, 0, 0);
+        roundedBox(g, 4.2, 0.4, 4.2, 0.4, accent, 0, 0, 0);
     }
   }
 
@@ -578,30 +964,33 @@
     }
 
     _buildLights() {
-      this.scene.add(new T.HemisphereLight(0xcfeaff, 0x7a9a60, 0.95));
-      const sun = new T.DirectionalLight(0xfff3d6, 1.25);
+      this.scene.add(new T.HemisphereLight(0xdff0ff, 0x82a56c, 1.05));
+      const sun = new T.DirectionalLight(0xfff5dd, 1.25);
       sun.position.set(-26, 42, 22);
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
       const sc = sun.shadow.camera;
       sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 5; sc.far = 120;
       sun.shadow.bias = -0.0006;
+      sun.shadow.radius = 2.0;
       this.scene.add(sun);
+      const ambient = new T.AmbientLight(0xffffff, 0.25);
+      this.scene.add(ambient);
     }
 
     _buildIsland() {
       this.island = new T.Group();
       this.scene.add(this.island);
       const rock = new T.Mesh(
-        new T.CylinderGeometry(29.5, 25, 12, 16, 1),
-        new T.MeshLambertMaterial({ color: '#9a8571', flatShading: true })
+        new T.CylinderGeometry(29.5, 25, 12, 48, 1),
+        new T.MeshLambertMaterial({ color: '#9a8571' })
       );
       rock.position.y = -6.3;
       rock.receiveShadow = true;
       this.island.add(rock);
       const under = new T.Mesh(
-        new T.ConeGeometry(25, 14, 10),
-        new T.MeshLambertMaterial({ color: '#7d6b59', flatShading: true })
+        new T.ConeGeometry(25, 14, 32),
+        new T.MeshLambertMaterial({ color: '#7d6b59' })
       );
       under.rotation.x = Math.PI;
       under.position.y = -19;
@@ -620,7 +1009,7 @@
       sand.position.y = -0.55;
       this.island.add(sand);
       const inner = new T.Mesh(
-        new T.CylinderGeometry(9.4, 9.4, 0.04, 40),
+        new T.CylinderGeometry(9.4, 9.4, 0.04, 48),
         new T.MeshLambertMaterial({ color: '#9ae06b' })
       );
       inner.position.y = 0.02;
@@ -628,42 +1017,57 @@
       this.island.add(inner);
       // pond
       const pond = new T.Mesh(
-        new T.CylinderGeometry(2.6, 2.6, 0.06, 28),
+        new T.CylinderGeometry(2.6, 2.6, 0.06, 32),
         new T.MeshLambertMaterial({ color: '#4cc3f0', transparent: true, opacity: 0.9 })
       );
       pond.position.set(-5, 0.07, -4.5);
       this.island.add(pond);
-      // rocks at cliffs
+      // rocks at cliffs - smooth rounded pebbles
       const r = rng(7);
       for (let i = 0; i < 14; i++) {
         const a = r() * Math.PI * 2;
         const rr = 26 + r() * 3;
         const m = new T.Mesh(
-          new T.DodecahedronGeometry(0.8 + r() * 1.0, 0),
-          new T.MeshLambertMaterial({ color: '#8b7d6b', flatShading: true })
+          new T.SphereGeometry(0.8 + r() * 0.9, 12, 10),
+          new T.MeshLambertMaterial({ color: '#8b7d6b' })
         );
+        m.scale.set(1.2, 0.6, 1.0);
         m.position.set(Math.cos(a) * rr, -0.4 + r() * 0.3, Math.sin(a) * rr);
         m.castShadow = true;
         this.island.add(m);
       }
     }
 
-    _ring(outer, inner, depth, color, y) {
+    _ring(outer, inner, depth, color, y, rOut = 3.2, rIn = 2.0) {
       const s = new T.Shape();
-      s.moveTo(-outer, -outer);
-      s.lineTo(outer, -outer);
-      s.lineTo(outer, outer);
-      s.lineTo(-outer, outer);
+      const ro = Math.min(rOut, outer * 0.45);
+      s.moveTo(-outer + ro, -outer);
+      s.lineTo(outer - ro, -outer);
+      s.quadraticCurveTo(outer, -outer, outer, -outer + ro);
+      s.lineTo(outer, outer - ro);
+      s.quadraticCurveTo(outer, outer, outer - ro, outer);
+      s.lineTo(-outer + ro, outer);
+      s.quadraticCurveTo(-outer, outer, -outer, outer - ro);
+      s.lineTo(-outer, -outer + ro);
+      s.quadraticCurveTo(-outer, -outer, -outer + ro, -outer);
       s.closePath();
+
       const h = new T.Path();
-      h.moveTo(-inner, -inner);
-      h.lineTo(-inner, inner);
-      h.lineTo(inner, inner);
-      h.lineTo(inner, -inner);
+      const ri = Math.min(rIn, inner * 0.45);
+      h.moveTo(-inner + ri, -inner);
+      h.lineTo(inner - ri, -inner);
+      h.quadraticCurveTo(inner, -inner, inner, -inner + ri);
+      h.lineTo(inner, inner - ri);
+      h.quadraticCurveTo(inner, inner, inner - ri, inner);
+      h.lineTo(-inner + ri, inner);
+      h.quadraticCurveTo(-inner, inner, -inner, inner - ri);
+      h.lineTo(-inner, -inner + ri);
+      h.quadraticCurveTo(-inner, -inner, -inner + ri, -inner);
       h.closePath();
       s.holes.push(h);
+
       const m = new T.Mesh(
-        new T.ExtrudeGeometry(s, { depth, bevelEnabled: false }),
+        new T.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 16 }),
         new T.MeshLambertMaterial({ color })
       );
       m.rotation.x = -Math.PI / 2;
@@ -674,19 +1078,24 @@
     }
 
     _buildRoads() {
-      this._ring(18.4, 9.6, 0.1, '#566070', 0);
-      this._ring(18.4, 17.6, 0.15, '#d8dee6', 0);
-      this._ring(10.4, 9.6, 0.15, '#d8dee6', 0);
-      // lane dashes on the road edge
-      const dash = new T.MeshBasicMaterial({ color: '#f5f5f5' });
-      for (let i = -17; i <= 17; i += 2.4) {
-        [[i, -14], [i, 14], [-14, i], [14, i]].forEach(([x, z]) => {
-          const d = new T.Mesh(new T.PlaneGeometry(1, 0.12), dash);
+      // Main asphalt boulevard with rounded corner curves
+      this._ring(18.5, 9.5, 0.1, '#475569', 0, 3.5, 2.2);
+      // Outer sidewalk curb
+      this._ring(18.5, 17.7, 0.14, '#cbd5e1', 0, 3.5, 3.2);
+      // Inner sidewalk curb
+      this._ring(10.3, 9.5, 0.14, '#cbd5e1', 0, 2.4, 2.2);
+
+      // Lane dashes on straight sections of the avenue
+      const dash = new T.MeshBasicMaterial({ color: '#f8fafc' });
+      for (let i = -13.5; i <= 13.5; i += 2.4) {
+        [[i, -13.6], [i, 13.6], [-13.6, i], [13.6, i]].forEach(([x, z]) => {
+          const d = new T.Mesh(new T.PlaneGeometry(1.1, 0.14), dash);
           d.rotation.x = -Math.PI / 2;
-          if (Math.abs(z) === 14) d.position.set(x, 0.115, z + (z > 0 ? -3.3 : 3.3));
-          else {
+          if (Math.abs(z) === 13.6) {
+            d.position.set(x, 0.115, z > 0 ? z - 0.2 : z + 0.2);
+          } else {
             d.rotation.z = Math.PI / 2;
-            d.position.set(x + (x > 0 ? -3.3 : 3.3), 0.115, z);
+            d.position.set(x > 0 ? x - 0.2 : x + 0.2, 0.115, z);
           }
           this.island.add(d);
         });
@@ -705,12 +1114,15 @@
         root.position.set(p.x, 0.1, p.z);
         root.userData.tileIndex = tile.index;
         this.island.add(root);
-        const edge = box(root, PAD + 0.3, 0.14, PAD + 0.3, '#ffffff', 0, 0, 0);
+
+        // Smooth rounded tile pedestal instead of sharp square slab
+        const edge = roundedBox(root, PAD + 0.36, 0.14, PAD + 0.36, 0.65, '#ffffff', 0, 0, 0);
         edge.receiveShadow = true;
-        const pad = box(root, PAD, 0.3, PAD, tile.zoneColor || '#64748b', 0, 0, 0);
+        const pad = roundedBox(root, PAD, 0.3, PAD, 0.55, tile.zoneColor || '#64748b', 0, 0, 0);
         pad.receiveShadow = true;
         pad.material = pad.material.clone();
         root.userData.pad = pad;
+
         const bldg = new T.Group();
         bldg.position.y = PAD_H - 0.1;
         root.add(bldg);
@@ -731,7 +1143,7 @@
       this.hereRing.rotation.x = Math.PI / 2;
       this.island.add(this.hereRing);
       this.arrow = new T.Mesh(
-        new T.ConeGeometry(0.55, 1.1, 4),
+        new T.ConeGeometry(0.55, 1.1, 8),
         new T.MeshLambertMaterial({ color: '#facc15', emissive: '#ca8a04', emissiveIntensity: 0.6 })
       );
       this.arrow.rotation.x = Math.PI;
@@ -741,6 +1153,7 @@
     _rebuildBuilding(index, info) {
       const tile = this.tiles[index];
       const root = this.tileRoots[index];
+      if (!root) return;
       const bldg = root.userData.bldg;
       while (bldg.children.length) {
         const c = bldg.children.pop();
@@ -750,29 +1163,48 @@
       bldg.userData = {};
       const colors = info.colors || {};
       const c = {
-        wall: colors.wall || '#3b82f6',
+        wall: colors.wall || tile.zoneColor || '#3b82f6',
         roof: colors.roof || '#2563eb'
       };
+      const lv = Number(info.level || 0);
       const isBld = tile.type === 'scenario' || (tile.type === 'ai-lot' && info.isBuilding);
+
       if (isBld) {
-        const lv = info.level || 0;
-        if (lv <= 0) buildConstruction(bldg, c.roof);
-        else if (lv === 1) buildShop(bldg, c);
-        else if (lv === 2) buildMidrise(bldg, c);
-        else buildSkyscraper(bldg, c);
+        const sId = tile.scenarioId || '';
+        const name = tile.name || '';
+        const icon = tile.icon || '';
+
+        // Display base building (Lv 1) so city is vibrant from the start, upgrading to Lv 2 / Lv 3 on success
+        const visLevel = Math.max(1, lv);
+
+        if (sId === 'shift-swap-request' || icon === '🏪' || name.includes('超商')) {
+          buildConvenienceStore(bldg, c, visLevel);
+        } else if (sId === 'cafe-barista-order' || icon === '☕' || name.includes('咖啡')) {
+          buildCafeBoba(bldg, c, visLevel, false);
+        } else if (sId === 'bubble-tea-order' || icon === '🧋' || name.includes('奶茶')) {
+          buildCafeBoba(bldg, c, visLevel, true);
+        } else if (sId === 'summer-internship-interview' || icon === '🚀' || name.includes('矽谷') || name.includes('新創')) {
+          buildTechPark(bldg, c, visLevel);
+        } else {
+          buildCommercialTower(bldg, c, visLevel, tile);
+        }
       } else if (tile.type === 'ai-lot') {
         buildConstruction(bldg, tile.zoneColor || '#8b5cf6');
       } else {
         buildSpecial(bldg, tile);
       }
+
       bldg.traverse((o) => {
-        if (o.isMesh) o.castShadow = true;
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
       });
       const bb = new T.Box3().setFromObject(bldg);
-      const top = Math.max(2.5, bb.max.y - root.position.y);
+      const top = Math.max(2.6, bb.max.y - root.position.y);
       root.userData.top = top;
-      root.userData.label.position.set(0, top + 1.2, 0);
-      root.userData.level = info.level || 0;
+      root.userData.label.position.set(0, top + 1.25, 0);
+      root.userData.level = lv;
       bldg.userData.popT = 0;
     }
 
@@ -978,7 +1410,7 @@
         }
         const tile = this.tiles[info.index];
         const lines = info.isBuilding
-          ? [info.name, '★'.repeat(info.level) + '☆'.repeat(3 - info.level) + '  Lv.' + info.level]
+          ? [info.name, info.level > 0 ? ('★'.repeat(info.level) + '☆'.repeat(3 - info.level) + '  Lv.' + info.level) : '💼 點擊展開任務']
           : [info.name];
         const lkey = lines.join('/');
         if (root.userData.lkey !== lkey) {

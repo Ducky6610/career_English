@@ -389,6 +389,15 @@
         if (e.target === taskModal) taskModal.classList.add('hidden');
       });
 
+      // Mobile Presence Sheet handlers
+      const feedEl = document.getElementById('live-feed');
+      document.getElementById('toggle-feed-mobile-btn')?.addEventListener('click', () => {
+        feedEl?.classList.toggle('open-sheet');
+      });
+      document.getElementById('close-feed-sheet-btn')?.addEventListener('click', () => {
+        feedEl?.classList.remove('open-sheet');
+      });
+
       // Bottom dock handlers
       document.getElementById('roll-dice-btn')?.addEventListener('click', () => {
         this.rollRichmanDice();
@@ -668,6 +677,7 @@
       this.presence = window.ExecVoice.createPresence({ tiles: BOARD_TILES });
 
       const countEl = document.getElementById('feed-online-count');
+      const mobileCountEl = document.getElementById('feed-mobile-count');
       const usersEl = document.getElementById('feed-users');
       const eventsEl = document.getElementById('feed-events');
       const meNameEl = document.getElementById('feed-me-name');
@@ -685,6 +695,7 @@
 
       this.presence.onUsers((users) => {
         if (countEl) countEl.textContent = `${users.length} 人在線`;
+        if (mobileCountEl) mobileCountEl.textContent = `${users.length} 人在線`;
         if (usersEl) {
           usersEl.innerHTML = users
             .map(
@@ -729,7 +740,7 @@
 
       if (rollBtn) {
         rollBtn.disabled = this.isRollingDice;
-        rollBtn.textContent = this.isRollingDice ? '🎲 3D 骰子旋轉中...' : '🎲 擲 3D 骰子前進 (Roll 3D Dice)';
+        rollBtn.textContent = this.isRollingDice ? '🎲 旋轉中...' : '🎲 擲 3D 骰子';
       }
 
       if (titleEl) {

@@ -1063,8 +1063,9 @@
     }
 
     resetView() {
+      const isNarrow = (this.container.clientWidth / Math.max(1, this.container.clientHeight)) < 0.85;
       this.cam.tTarget.set(0, 1, 2);
-      this.cam.tDist = 62;
+      this.cam.tDist = isNarrow ? 76 : 62;
       this.cam.tAz = 0.75;
       this.cam.tEl = 0.72;
     }
@@ -1115,7 +1116,7 @@
       const up = (e) => {
         pointers.delete(e.pointerId);
         pinch = 0;
-        if (down && down.moved < 6 && performance.now() - down.t < 600 && e.type === 'pointerup') {
+        if (down && down.moved < 18 && performance.now() - down.t < 650 && e.type === 'pointerup') {
           this._setMouse(e);
           const idx = this._pick();
           if (idx >= 0) this.onTileClick(idx);
@@ -1164,6 +1165,10 @@
       this.renderer.domElement.style.width = '100%';
       this.renderer.domElement.style.height = '100%';
       this.camera.aspect = w / h;
+      if (this.camera.aspect < 0.85) {
+        const factor = Math.min(1.4, 0.85 / this.camera.aspect);
+        this.cam.tDist = Math.max(this.cam.tDist, 60 * factor);
+      }
       this.camera.updateProjectionMatrix();
     }
 

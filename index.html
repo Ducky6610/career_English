@@ -78,7 +78,7 @@
       <div class="header-Bottom-Row">
         <nav class="main-nav-tabs" aria-label="主要功能切換">
           <button class="nav-tab active" data-view="hub">
-            <span>🎲 1. 模擬城市 3D 大富翁棋盤</span>
+            <span>🏝️ 1. 3D 動態島城市</span>
           </button>
           <button class="nav-tab" data-view="studio" id="nav-tab-studio">
             <span>🎙️ 2. 當前職場建築語音對練室</span>
@@ -89,8 +89,8 @@
         </nav>
 
         <div class="header-actions">
-          <button id="toggle-3d-camera-btn" class="status-pill status-connected" title="切換 3D 模擬城市等距斜角與 3D 俯視角">
-            🎥 視角：3D 模擬城市立體斜角
+          <button id="toggle-3d-camera-btn" class="status-pill status-connected" title="重置 3D 島城視角">
+            🎥 重置 3D 視角
           </button>
           <button id="open-api-modal-btn" class="status-pill status-demo">
             🔑 設定 API Key
@@ -111,31 +111,71 @@
 
     <!-- VIEW 1: 3D SIMCITY RICHMAN BOARD -->
     <main id="view-hub" class="view-section active">
-      <div class="simcity-board-layout">
-        <!-- Left: 3D Isometric SimCity Loop Board -->
-        <section class="simcity-map-viewport" aria-label="模擬城市 3D 大富翁棋盤">
-          <div class="map-toolbar">
-            <div class="map-toolbar-left">
-              <span class="zone-legend legend-c">🟦 商業打工區</span>
-              <span class="zone-legend legend-i">🟨 企業實習園區</span>
-              <span class="zone-legend legend-g">🟩 公共文教志工區</span>
-              <span class="zone-legend legend-s">🟪 機會命運（僅擲骰走到觸發一次）</span>
-            </div>
-            <div class="map-toolbar-right">
-              <span class="map-hint-pill">🔒 嚴格大富翁規則：僅能靠擲骰子移動，不可任意點選切換關卡或刷錢</span>
+      <!-- 3D FLOATING ISLAND CITY -->
+      <section class="island-stage" aria-label="3D 動態島城市">
+        <div id="island-canvas-wrap" class="island-canvas-wrap"></div>
+
+        <div class="island-hud island-hud-top">
+          <div class="island-legend">
+            <span class="zone-legend legend-c">🟦 商業打工區</span>
+            <span class="zone-legend legend-i">🟨 企業實習園區</span>
+            <span class="zone-legend legend-g">🟩 公共文教志工區</span>
+            <span class="zone-legend legend-s">🟪 機會命運（走到才觸發一次）</span>
+          </div>
+          <div class="island-hint">🖱️ 拖曳旋轉 · 滾輪縮放 · 點擊建築查看任務（需先擲骰走到該建築才能開始對話）</div>
+        </div>
+
+        <div class="island-cam-btns">
+          <button id="focus-player-btn" class="island-mini-btn" type="button">📍 回到我的位置</button>
+          <button id="reset-view-btn" class="island-mini-btn" type="button">🔄 重置視角</button>
+        </div>
+
+        <aside class="island-feed" id="live-feed" aria-label="城市即時動態">
+          <div class="feed-head">
+            <strong>🌐 城市即時動態</strong>
+            <span id="feed-online-count" class="feed-count">0 人在線</span>
+          </div>
+          <div class="feed-me">
+            <span class="feed-dot" id="feed-me-dot"></span>
+            <span>你是 <strong id="feed-me-name">同學</strong></span>
+            <button id="rename-self-btn" class="feed-rename" type="button" title="修改暱稱">✏️</button>
+          </div>
+          <ul id="feed-users" class="feed-users"></ul>
+          <div class="feed-sub">📣 最新消息</div>
+          <ul id="feed-events" class="feed-events"></ul>
+        </aside>
+
+        <div class="island-dock">
+          <div class="dock-dice">
+            <div class="dice-3d-scene-wrap dock-dice-wrap" id="dice-3d-trigger" title="點擊擲 3D 骰子">
+              <div id="dice-3d-cube" class="dice-3d-cube">
+                <div class="cube-face face-1">⚀</div>
+                <div class="cube-face face-2">⚁</div>
+                <div class="cube-face face-3">⚂</div>
+                <div class="cube-face face-4">⚃</div>
+                <div class="cube-face face-5">⚄</div>
+                <div class="cube-face face-6">⚅</div>
+              </div>
             </div>
           </div>
-
-          <!-- 3D Perspective Stage Container -->
-          <div id="simcity-3d-scene" class="simcity-3d-scene iso-tilted">
-            <div id="simcity-board-grid" class="simcity-board-grid">
-              <!-- Populated by app.js with 3D extruded tiles, 3D multi-story buildings, 3D cube dice, and 3D player pawn -->
-            </div>
+          <div class="dock-main">
+            <div id="plaza-status-title" class="plaza-status-title">📍 玩家目前所在位置</div>
+            <div id="plaza-status-desc" class="plaza-status-desc"></div>
           </div>
-        </section>
+          <div class="dock-actions">
+            <button id="roll-dice-btn" class="btn-roll-dice">🎲 擲 3D 骰子前進</button>
+            <button id="plaza-enter-studio-btn" type="button" class="btn-plaza-enter" disabled>🎙️ 進入腳下建築開始任務</button>
+          </div>
+        </div>
 
-        <!-- Right: Current Landed Building Blueprint & 3-Stage Progression Card -->
-        <aside class="hub-preview-panel">
+        <div id="island-tooltip" class="island-tooltip hidden"></div>
+      </section>
+
+      <!-- BUILDING TASK MODAL: opens only when the student clicks a building -->
+      <div id="building-task-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+        <div class="modal-card task-modal-card">
+          <button id="close-task-modal-btn" class="btn-close task-modal-close" aria-label="關閉">✕</button>
+          <div class="hub-preview-panel">
           <div class="preview-sticky-card simcity-blueprint-card">
             <div class="blueprint-top-ribbon">
               <span id="preview-zone-badge" class="badge-zone">🟦 商業區 · 餐飲門市</span>
@@ -202,7 +242,8 @@
               </button>
             </div>
           </div>
-        </aside>
+          </div>
+        </div>
       </div>
 
       <!-- READ-ONLY BUILDING DEVELOPMENT ATLAS & CLEAR REWARD RULES -->
@@ -551,6 +592,9 @@
   <script src="./scenarios.js"></script>
   <script src="./audio-engine.js"></script>
   <script src="./gemini-service.js"></script>
+  <script src="./vendor/three.min.js"></script>
+  <script src="./island3d.js"></script>
+  <script src="./presence.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

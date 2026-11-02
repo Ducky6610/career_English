@@ -244,7 +244,13 @@
       this.totalFillers = 0;
       this.lastEvaluation = null;
 
+      this.playerId = this.safeGetStorage('workplace_english_player_id') || ('u-' + Math.random().toString(36).slice(2, 8));
+      this.safeSetStorage('workplace_english_player_id', this.playerId);
+      this.playerName = this.safeGetStorage('workplace_english_player_name') || '高中實習生';
+
       this.initDOM();
+      this.initIsland3D();
+      this.initPresence();
       this.updateTycoonHudUI();
       this.renderSimCityBoard();
       this.renderScenarioList();
@@ -363,15 +369,50 @@
         });
       });
 
-      // 3D Camera Tilt View Toggle
-      const toggleCameraBtn = document.getElementById('toggle-3d-camera-btn');
-      const scene3D = document.getElementById('simcity-3d-scene');
-      toggleCameraBtn?.addEventListener('click', () => {
-        const isTilted = scene3D?.classList.toggle('iso-tilted');
-        scene3D?.classList.toggle('flat-view', !isTilted);
-        toggleCameraBtn.textContent = isTilted
-          ? '🎥 視角：3D 模擬城市立體斜角'
-          : '🎥 視角：2D 頂視俯瞰平視角';
+      // Camera Controls
+      document.getElementById('focus-player-btn')?.addEventListener('click', () => {
+        this.islandCity?.focusPlayer();
+      });
+      document.getElementById('reset-view-btn')?.addEventListener('click', () => {
+        this.islandCity?.resetView();
+      });
+      document.getElementById('toggle-3d-camera-btn')?.addEventListener('click', () => {
+        this.islandCity?.resetView();
+      });
+
+      // Building task modal handlers
+      const taskModal = document.getElementById('building-task-modal');
+      document.getElementById('close-task-modal-btn')?.addEventListener('click', () => {
+        taskModal?.classList.add('hidden');
+      });
+      taskModal?.addEventListener('click', (e) => {
+        if (e.target === taskModal) taskModal.classList.add('hidden');
+      });
+
+      // Bottom dock handlers
+      document.getElementById('roll-dice-btn')?.addEventListener('click', () => {
+        this.rollRichmanDice();
+      });
+      document.getElementById('dice-3d-trigger')?.addEventListener('click', () => {
+        this.rollRichmanDice();
+      });
+      document.getElementById('plaza-enter-studio-btn')?.addEventListener('click', () => {
+        const curTile = BOARD_TILES[this.tycoon.playerTileIndex];
+        if (curTile?.type !== 'scenario' && curTile?.type !== 'ai-lot') {
+          this.showToast('🎲 請先擲 3D 骰子走到職場建築格！');
+          return;
+        }
+        let scenarioObj = null;
+        if (curTile.type === 'scenario') {
+          scenarioObj = this.allScenarios.find((s) => s.id === curTile.scenarioId);
+        } else if (curTile.type === 'ai-lot' && this.customScenarios.length > 0) {
+          scenarioObj = this.customScenarios[0];
+        }
+        if (scenarioObj) {
+          this.selectedScenario = scenarioObj;
+          this.renderSelectedScenarioPreview();
+          document.getElementById('building-task-modal')?.classList.remove('hidden');
+        }
       });
 
       document.getElementById('back-to-map-btn')?.addEventListener('click', () => {
@@ -473,6 +514,7 @@
           return;
         }
 
+        document.getElementById('building-task-modal')?.classList.add('hidden');
         this.switchView('studio');
         this.startVoiceCall();
       });
@@ -548,261 +590,203 @@
       });
 
       if (viewName === 'studio') {
+        this.islandCity?.setPaused(true);
         this.populateStudioHeader();
       } else if (viewName === 'hub') {
+        this.islandCity?.setPaused(false);
         this.renderSimCityBoard();
+      } else {
+        this.islandCity?.setPaused(true);
       }
     }
 
     /**
      * Renders the 5x5 SimCity 3D Richman Board + 3D Extruded Buildings + 3D Rolling Dice Cube
      */
-    /**
-     * Builds one true 3D cuboid (front/back/left/right walls + roof) with CSS 3D transforms.
-     * (x,y) = offset of the cuboid center on the tile plane, z = base height.
-     */
-    cuboid(w, d, h, { x = 0, y = 0, z = 0, colors, cls = '', icon = '' } = {}) {
-      const c = colors || {};
-      return `
-        <div class="bld-box ${cls}" style="--w:${w}px;--d:${d}px;--h:${h}px;--roof:${c.roof};--front:${c.front};--side:${c.side};transform:translate3d(${x}px,${y}px,${z + h / 2}px) rotateX(-90deg);">
-          <div class="bld-face bld-f-front"><span class="bld-face-emoji">${icon}</span></div>
-          <div class="bld-face bld-f-back"></div>
-          <div class="bld-face bld-f-right"></div>
-          <div class="bld-face bld-f-left"></div>
-          <div class="bld-face bld-f-top"></div>
-        </div>`;
+    initIsland3D() {
+      const container = document.getElementById('island-canvas-wrap');
+      if (!container || !window.ExecVoice.IslandCity) return;
+
+      this.islandCity = new window.ExecVoice.IslandCity(container, {
+        tiles: BOARD_TILES,
+        onTileClick: (idx) => this.handle3DTileClick(idx)
+      });
+
+      const tooltip = document.getElementById('island-tooltip');
+      if (tooltip && this.islandCity) {
+        this.islandCity.onHover = (idx, pos) => {
+          if (idx < 0) {
+            tooltip.classList.add('hidden');
+            return;
+          }
+          const t = BOARD_TILES[idx];
+          if (!t) return;
+          let scenarioObj = null;
+          if (t.type === 'scenario') {
+            scenarioObj = this.allScenarios.find((s) => s.id === t.scenarioId);
+          } else if (t.type === 'ai-lot' && this.customScenarios.length > 0) {
+            scenarioObj = this.customScenarios[0];
+          }
+          const lv = scenarioObj ? (this.tycoon.buildingLevels[scenarioObj.id] || 0) : 0;
+          const label = scenarioObj
+            ? `${t.icon || '🏢'} ${scenarioObj.buildingName || t.name} (Lv.${lv}) · 點擊查看任務`
+            : `${t.icon || '📍'} ${t.name} · ${t.rewardText}`;
+          tooltip.textContent = label;
+          tooltip.style.left = `${pos.x}px`;
+          tooltip.style.top = `${pos.y}px`;
+          tooltip.classList.remove('hidden');
+        };
+      }
     }
 
-    buildVolumetricBuilding(level, colors, icon) {
-      if (level === -1) {
-        // Special tile: low plinth with icon on the front wall
-        return `<div class="bld-stage" title="特殊地塊">${this.cuboid(40, 40, 12, { colors, icon })}</div>`;
+    handle3DTileClick(idx) {
+      if (this.isRollingDice) return;
+      const clickedTile = BOARD_TILES[idx];
+      if (!clickedTile) return;
+
+      let scenarioObj = null;
+      if (clickedTile.type === 'scenario') {
+        scenarioObj = this.allScenarios.find((s) => s.id === clickedTile.scenarioId);
+      } else if (clickedTile.type === 'ai-lot') {
+        scenarioObj = this.customScenarios.length > 0 ? this.customScenarios[0] : null;
       }
-      if (level === 0) {
-        // Construction site: foundation slab + hazard posts + crane arm
-        return `<div class="bld-stage lv-0" title="未開發地皮 (待建案開工)">
-          ${this.cuboid(46, 40, 5, { colors: { roof: '#78716c', front: '#57534e', side: '#44403c' }, cls: 'bld-slab' })}
-          ${this.cuboid(5, 5, 22, { x: -18, y: -14, z: 5, colors: { roof: '#facc15', front: '#eab308', side: '#ca8a04' } })}
-          ${this.cuboid(5, 5, 22, { x: 18, y: -14, z: 5, colors: { roof: '#facc15', front: '#eab308', side: '#ca8a04' } })}
-          ${this.cuboid(4, 4, 34, { x: 12, y: 8, z: 5, colors: { roof: '#fb923c', front: '#f97316', side: '#ea580c' } })}
-          ${this.cuboid(30, 3, 3, { x: -2, y: 8, z: 39, colors: { roof: '#fb923c', front: '#f97316', side: '#ea580c' } })}
-        </div>`;
+
+      if (scenarioObj) {
+        this.selectedScenario = scenarioObj;
+        this.renderSelectedScenarioPreview();
+        this.updateDockUI();
+        // Trigger mission briefing dialog!
+        const modal = document.getElementById('building-task-modal');
+        modal?.classList.remove('hidden');
+      } else {
+        this.showToast(`📌 [#${idx + 1} ${clickedTile.name}]：${clickedTile.description || clickedTile.rewardText}`);
       }
-      if (level === 1) {
-        // Lv.1 street shop: single low box + awning + sign
-        return `<div class="bld-stage lv-1" title="Lv.1 街邊門市 (★☆☆)">
-          ${this.cuboid(44, 38, 28, { colors, cls: 'bld-windows bld-w-1', icon })}
-          ${this.cuboid(48, 14, 4, { y: 22, z: 20, colors: { roof: '#fde047', front: '#f59e0b', side: '#d97706' } })}
-        </div>`;
+    }
+
+    initPresence() {
+      if (!window.ExecVoice.createPresence) return;
+      this.presence = window.ExecVoice.createPresence({ tiles: BOARD_TILES });
+
+      const countEl = document.getElementById('feed-online-count');
+      const usersEl = document.getElementById('feed-users');
+      const eventsEl = document.getElementById('feed-events');
+      const meNameEl = document.getElementById('feed-me-name');
+      if (meNameEl) meNameEl.textContent = this.playerName;
+
+      document.getElementById('rename-self-btn')?.addEventListener('click', () => {
+        const next = prompt('請輸入你在 3D 島城的暱稱：', this.playerName);
+        if (next && next.trim()) {
+          this.playerName = next.trim().slice(0, 10);
+          this.safeSetStorage('workplace_english_player_name', this.playerName);
+          if (meNameEl) meNameEl.textContent = this.playerName;
+          this.presence?.updateSelf({ name: this.playerName });
+        }
+      });
+
+      this.presence.onUsers((users) => {
+        if (countEl) countEl.textContent = `${users.length} 人在線`;
+        if (usersEl) {
+          usersEl.innerHTML = users
+            .map(
+              (u) => `
+            <li class="feed-user-chip" title="#${u.tile + 1} 格 · ${u.buildings || 0} 棟建築">
+              <span class="u-dot" style="background:${u.color || '#38bdf8'}"></span>
+              <span>${this.escapeHtml(u.name)}${u.me ? ' (你)' : ''}</span>
+            </li>`
+            )
+            .join('');
+        }
+        const others = users.filter((u) => !u.me);
+        this.islandCity?.setRemotePlayers(others);
+      });
+
+      this.presence.onEvent((ev) => {
+        if (!eventsEl) return;
+        const li = document.createElement('li');
+        li.className = 'feed-event-item';
+        li.textContent = ev.text;
+        eventsEl.prepend(li);
+        while (eventsEl.children.length > 25) {
+          eventsEl.removeChild(eventsEl.lastChild);
+        }
+      });
+
+      this.presence.start({
+        id: this.playerId,
+        name: this.playerName,
+        color: '#f97316',
+        tile: this.tycoon.playerTileIndex,
+        buildings: Object.values(this.tycoon.buildingLevels || {}).filter((v) => v >= 1).length
+      });
+    }
+
+    updateDockUI() {
+      const currentLandedTile = BOARD_TILES[this.tycoon.playerTileIndex] || BOARD_TILES[0];
+      const titleEl = document.getElementById('plaza-status-title');
+      const descEl = document.getElementById('plaza-status-desc');
+      const enterBtn = document.getElementById('plaza-enter-studio-btn');
+      const rollBtn = document.getElementById('roll-dice-btn');
+
+      if (rollBtn) {
+        rollBtn.disabled = this.isRollingDice;
+        rollBtn.textContent = this.isRollingDice ? '🎲 3D 骰子旋轉中...' : '🎲 擲 3D 骰子前進 (Roll 3D Dice)';
       }
-      if (level === 2) {
-        // Lv.2 mid-rise: podium + tower + rooftop unit
-        return `<div class="bld-stage lv-2" title="Lv.2 旗艦商業大樓 (★★☆)">
-          ${this.cuboid(50, 42, 16, { colors, cls: 'bld-windows bld-w-1' })}
-          ${this.cuboid(38, 32, 46, { z: 16, colors, cls: 'bld-windows bld-w-2 bld-glass', icon })}
-          ${this.cuboid(14, 12, 8, { x: 6, y: -4, z: 62, colors: { roof: '#94a3b8', front: '#64748b', side: '#475569' } })}
-        </div>`;
+
+      if (titleEl) {
+        titleEl.innerHTML = `📍 目前所在位置：#${currentLandedTile.index + 1} ${this.escapeHtml(currentLandedTile.name)}`;
       }
-      // Lv.3 landmark skyscraper: podium + tower + setback + crown + antenna
-      const gold = { roof: '#fde047', front: '#d97706', side: '#92400e' };
-      return `<div class="bld-stage lv-3" title="Lv.3 摩天大樓地標 (★★★)">
-        ${this.cuboid(52, 44, 14, { colors, cls: 'bld-windows bld-w-1' })}
-        ${this.cuboid(38, 34, 60, { z: 14, colors: gold, cls: 'bld-windows bld-w-3 bld-gold', icon: '🏙️' })}
-        ${this.cuboid(26, 24, 26, { z: 74, colors: gold, cls: 'bld-windows bld-w-3 bld-gold' })}
-        ${this.cuboid(14, 14, 8, { z: 100, colors: { roof: '#fef08a', front: '#fbbf24', side: '#d97706' } })}
-        ${this.cuboid(3, 3, 24, { z: 108, colors: { roof: '#ef4444', front: '#dc2626', side: '#b91c1c' }, cls: 'bld-beacon' })}
-      </div>`;
+
+      let scenarioObj = null;
+      if (currentLandedTile.type === 'scenario') {
+        scenarioObj = this.allScenarios.find((s) => s.id === currentLandedTile.scenarioId);
+      } else if (currentLandedTile.type === 'ai-lot' && this.customScenarios.length > 0) {
+        scenarioObj = this.customScenarios[0];
+      }
+
+      if (descEl) {
+        if (scenarioObj) {
+          const lv = this.tycoon.buildingLevels[scenarioObj.id] || 0;
+          descEl.innerHTML = `當前建築：<strong>${this.escapeHtml(scenarioObj.buildingName || scenarioObj.title)} (Lv.${lv})</strong> ｜ 點擊「進入腳下建築」或點擊島上建築即可打開任務視窗！`;
+        } else {
+          descEl.innerHTML = `停留於非建築格（${this.escapeHtml(currentLandedTile.description || currentLandedTile.rewardText)}），請擲骰子前進！`;
+        }
+      }
+
+      if (enterBtn) {
+        enterBtn.disabled = !scenarioObj || this.isRollingDice;
+      }
     }
 
     renderSimCityBoard() {
-      const grid = document.getElementById('simcity-board-grid');
-      if (!grid || !BOARD_TILES) return;
-
-      const currentLandedTile = BOARD_TILES[this.tycoon.playerTileIndex] || BOARD_TILES[0];
-
-      const tilesHtml = BOARD_TILES.map((tile) => {
-        let scenarioObj = null;
-        if (tile.type === 'scenario') {
-          scenarioObj = this.allScenarios.find((s) => s.id === tile.scenarioId);
-        } else if (tile.type === 'ai-lot' && this.customScenarios.length > 0) {
-          scenarioObj = this.customScenarios[0];
-        }
-
-        const isPlayerHere = this.tycoon.playerTileIndex === tile.index;
-        const isSelected =
-          (scenarioObj && this.selectedScenario?.id === scenarioObj.id) ||
-          (!scenarioObj && isPlayerHere);
-
-        const bldLevel = scenarioObj ? this.tycoon.buildingLevels[scenarioObj.id] || 0 : 0;
-        const starsText =
-          scenarioObj
-            ? '★'.repeat(bldLevel) + '☆'.repeat(Math.max(0, 3 - bldLevel))
-            : '✦';
-
-        const displayTitle = scenarioObj?.buildingName || tile.name;
-        const displaySub = scenarioObj?.buildingSub || tile.subName;
-        const displayIcon = scenarioObj?.buildingIcon || tile.icon;
-        const displayReward = scenarioObj
-          ? `Lv.${bldLevel} · 獎金 $${(scenarioObj.baseReward || 1200).toLocaleString()}`
-          : tile.rewardText;
-
-        // TRUE 3D VOLUMETRIC BUILDING (real cuboids with 4 walls + roof)
-        let bld3DHtml = '';
-        if (tile.type === 'scenario' || tile.type === 'ai-lot') {
-          const colors = {
-            roof: scenarioObj?.roofColor || '#3b82f6',
-            front: scenarioObj?.wallColorLeft || '#2563eb',
-            side: scenarioObj?.wallColorRight || '#1d4ed8'
-          };
-          bld3DHtml = this.buildVolumetricBuilding(bldLevel, colors, displayIcon);
-        } else {
-          bld3DHtml = this.buildVolumetricBuilding(-1, {
-            roof: tile.zoneColor || '#64748b',
-            front: '#334155',
-            side: '#1e293b'
-          }, displayIcon);
-        }
-
-        return `
-          <div
-            class="board-tile lv-${bldLevel} ${isSelected ? 'tile-selected' : ''} ${
-              isPlayerHere ? 'tile-player-here' : ''
-            }"
-            style="grid-row: ${tile.gridRow}; grid-column: ${tile.gridCol};"
-            data-tile-index="${tile.index}"
-            title="點擊預覽此建築任務藍圖（僅能靠擲骰子移動挑戰）"
-          >
-            ${
-              isPlayerHere
-                ? `<div class="player-pawn-token-3d" title="你目前所在位置">
-                     <div class="pawn-avatar-badge"><span>🧑‍🎓</span><span>YOU</span></div>
-                     <div class="pawn-shadow-ellipse"></div>
-                   </div>`
-                : ''
-            }
-            <div class="tile-roof-bar" style="background: ${tile.zoneColor || '#3b82f6'};">
-              <span class="tile-num-tag">#${tile.index + 1}</span>
-              <span class="tile-stars">${starsText}</span>
-            </div>
-
-            <div class="tile-building-body">
-              ${bld3DHtml}
-              <div class="tile-title">${this.escapeHtml(displayTitle)}</div>
-              <div class="tile-sub">${this.escapeHtml(displaySub)}</div>
-            </div>
-
-            <div class="tile-footer-price">${this.escapeHtml(displayReward)}</div>
-          </div>
-        `;
-      }).join('');
-
-      // Central Command Plaza with 3D Rolling Dice Cube
-      const centerPlazaHtml = `
-        <div class="simcity-center-plaza">
-          <div class="plaza-skyline-header">
-            <div class="plaza-title-group">
-              <h3>🏙️ 模擬城市中央指揮廣場 (SimCity Central Plaza)</h3>
-              <p>嚴格大富翁機制：擲 3D 骰子前進，走到哪就挑戰哪棟建築！重複走到可領營運分紅並擴建摩天大樓！</p>
-            </div>
-            <div class="plaza-skyline-mini" aria-hidden="true">
-              <span>🌲</span><span>🏠</span><span>🏢</span><span>🏙️</span><span>🎡</span><span>🌳</span>
-            </div>
-          </div>
-
-          <div class="plaza-dice-arena">
-            <div class="dice-3d-scene-wrap" id="dice-3d-trigger" title="點擊擲 3D 骰子">
-              <div id="dice-3d-cube" class="dice-3d-cube ${this.isRollingDice ? 'rolling' : ''}">
-                <div class="cube-face face-1">⚀</div>
-                <div class="cube-face face-2">⚁</div>
-                <div class="cube-face face-3">⚂</div>
-                <div class="cube-face face-4">⚃</div>
-                <div class="cube-face face-5">⚄</div>
-                <div class="cube-face face-6">⚅</div>
-              </div>
-            </div>
-            <div class="dice-controls-col">
-              <button id="roll-dice-btn" class="btn-roll-dice" ${this.isRollingDice ? 'disabled' : ''}>
-                🎲 ${this.isRollingDice ? '3D 骰子旋轉前進中...' : '擲 3D 骰子前進 (Roll 3D Dice)'}
-              </button>
-              <span class="dice-rule-badge">🔒 每次擲骰由系統公平產生 1~6 步數</span>
-            </div>
-          </div>
-
-          <div class="plaza-tile-status-card">
-            <div class="plaza-status-info">
-              <div class="plaza-status-title">
-                📍 玩家目前所在位置：#${currentLandedTile.index + 1} ${this.escapeHtml(currentLandedTile.name)}
-              </div>
-              <div class="plaza-status-desc">
-                ${
-                  currentLandedTile.type === 'scenario' || currentLandedTile.type === 'ai-lot'
-                    ? `當前建築目標：<strong>${this.escapeHtml(
-                        this.selectedScenario?.buildingName || this.selectedScenario?.title || ''
-                      )}</strong> ｜ 點擊右方綠色按鈕即可開口進行英語驗收挑戰！`
-                    : `當前停留於非建築格（${currentLandedTile.description || currentLandedTile.rewardText}），請擲 3D 骰子前進以進入職場建築！`
-                }
-              </div>
-            </div>
-            <button
-              id="plaza-enter-studio-btn"
-              type="button"
-              class="btn-plaza-enter"
-              ${currentLandedTile.type !== 'scenario' && currentLandedTile.type !== 'ai-lot' ? 'disabled' : ''}
-            >
-              🎙️ 進入當前建築開始任務
-            </button>
-          </div>
-        </div>
-      `;
-
-      grid.innerHTML = tilesHtml + centerPlazaHtml;
-
-      // Bind Tile Click for PREVIEW INSPECTION ONLY (Students CANNOT click to move or farm money!)
-      grid.querySelectorAll('.board-tile').forEach((tileEl) => {
-        tileEl.addEventListener('click', () => {
-          if (this.isRollingDice) return;
-          const idx = Number(tileEl.dataset.tileIndex);
-          const clickedTile = BOARD_TILES[idx];
-          if (!clickedTile) return;
-
+      if (this.islandCity && BOARD_TILES) {
+        const infos = BOARD_TILES.map((tile) => {
           let scenarioObj = null;
-          if (clickedTile.type === 'scenario') {
-            scenarioObj = this.allScenarios.find((s) => s.id === clickedTile.scenarioId);
-          } else if (clickedTile.type === 'ai-lot' && this.customScenarios.length > 0) {
+          if (tile.type === 'scenario') {
+            scenarioObj = this.allScenarios.find((s) => s.id === tile.scenarioId);
+          } else if (tile.type === 'ai-lot' && this.customScenarios.length > 0) {
             scenarioObj = this.customScenarios[0];
           }
-
-          if (scenarioObj) {
-            this.selectedScenario = scenarioObj;
-            this.renderSimCityBoard();
-            this.renderSelectedScenarioPreview();
-          } else {
-            this.showToast(`📌 [#${idx + 1} ${clickedTile.name}]：${clickedTile.description || clickedTile.rewardText}`);
-          }
+          const lv = scenarioObj ? (this.tycoon.buildingLevels[scenarioObj.id] || 0) : 0;
+          return {
+            index: tile.index,
+            name: scenarioObj?.buildingName || tile.name,
+            level: lv,
+            isBuilding: !!scenarioObj,
+            colors: {
+              wall: scenarioObj?.wallColorLeft || '#3b82f6',
+              roof: scenarioObj?.roofColor || '#2563eb'
+            }
+          };
         });
-      });
+        this.islandCity.setTileInfos(infos);
+        this.islandCity.setPlayerTile(this.tycoon.playerTileIndex, false);
+      }
 
-      // Bind 3D Dice Roll Handlers
-      document.getElementById('roll-dice-btn')?.addEventListener('click', () => {
-        this.rollRichmanDice();
-      });
-      document.getElementById('dice-3d-trigger')?.addEventListener('click', () => {
-        this.rollRichmanDice();
-      });
-
-      document.getElementById('plaza-enter-studio-btn')?.addEventListener('click', () => {
-        const curTile = BOARD_TILES[this.tycoon.playerTileIndex];
-        if (curTile?.type !== 'scenario' && curTile?.type !== 'ai-lot') {
-          this.showToast('🎲 請先擲 3D 骰子走到職場建築格！');
-          return;
-        }
-        this.switchView('studio');
-        this.startVoiceCall();
-      });
+      this.updateDockUI();
     }
 
     /**
-     * Fair 3D Dice Roll with 3D cube tumbling animation and step-by-step pawn movement
+     * Fair 3D Dice Roll with 3D cube tumbling animation and step-by-step pawn movement across the 3D Island
      */
     async rollRichmanDice() {
       if (this.isRollingDice) return;
@@ -824,11 +808,7 @@
         6: 'rotateX(90deg) rotateY(0deg)'
       };
 
-      const rollBtn = document.getElementById('roll-dice-btn');
-      if (rollBtn) {
-        rollBtn.disabled = true;
-        rollBtn.textContent = '🎲 3D 骰子旋轉中...';
-      }
+      this.updateDockUI();
 
       await new Promise((r) => setTimeout(r, 650));
       cubeEl?.classList.remove('rolling');
@@ -838,7 +818,7 @@
 
       await new Promise((r) => setTimeout(r, 200));
 
-      // Step-by-step 3D pawn movement
+      // Step-by-step 3D pawn movement across the 3D Island!
       for (let i = 1; i <= steps; i++) {
         this.tycoon.playerTileIndex = (this.tycoon.playerTileIndex + 1) % BOARD_TILES.length;
         playGameSfx('step');
@@ -848,22 +828,27 @@
           this.tycoon.day += 1;
           playGameSfx('payday');
           this.showToast('🏛️ 經過市政廳發薪日！領取青年職涯津貼 +$1,000！');
+          this.presence?.publishEvent(`💰 ${this.playerName} 經過市政廳領薪水 +$1,000！`);
         }
 
-        this.renderSimCityBoard();
-        await new Promise((r) => setTimeout(r, 220));
+        this.islandCity?.setPlayerTile(this.tycoon.playerTileIndex, true);
+        this.updateDockUI();
+        await new Promise((r) => setTimeout(r, 320));
       }
 
       this.isRollingDice = false;
       this.tycoon.day += 1;
       this.saveTycoonState();
-      this.renderSimCityBoard();
+      this.updateDockUI();
+
+      this.presence?.updateSelf({
+        tile: this.tycoon.playerTileIndex,
+        buildings: Object.values(this.tycoon.buildingLevels || {}).filter((v) => v >= 1).length
+      });
+
       this.handleLandOnTile(this.tycoon.playerTileIndex, false);
     }
 
-    /**
-     * Handles landing on a tile via DICE ONLY (Never via direct click!)
-     */
     handleLandOnTile(tileIndex, isDirectClick = false) {
       const tile = BOARD_TILES[tileIndex];
       if (!tile) return;
@@ -2140,6 +2125,19 @@
       this.renderSimCityBoard();
       this.renderScenarioList();
       this.renderSelectedScenarioPreview();
+
+      if (newLevel > prevLevel) {
+        this.presence?.publishEvent(
+          `🏗️ ${this.playerName} 在「${s.buildingName || s.title}」英語評鑑通過，成功升級為 Lv.${newLevel}！`
+        );
+      } else {
+        this.presence?.publishEvent(
+          `💪 ${this.playerName} 在「${s.buildingName || s.title}」完成了英語對話練習！`
+        );
+      }
+      this.presence?.updateSelf({
+        buildings: Object.values(this.tycoon.buildingLevels || {}).filter((v) => v >= 1).length
+      });
 
       this.lastEvalRewardInfo = {
         buildingName: s.buildingName || s.title,

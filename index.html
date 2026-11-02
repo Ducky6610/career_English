@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SimCareer 大富翁｜模擬城市高中職場英語真人語音對練系統</title>
+  <title>SimCareer 3D 職場大富翁｜模擬城市高中職場英語真人語音對練系統</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
@@ -14,19 +14,19 @@
     <!-- SIMCITY MAYOR & RICHMAN TYCOON TOP HUD -->
     <header class="top-navbar simcity-navbar">
       <div class="brand-group">
-        <div class="brand-logo" title="模擬城市 × 大富翁職場英語">🏙️</div>
+        <div class="brand-logo" title="模擬城市 3D × 大富翁職場英語">🏙️</div>
         <div>
           <h1 class="brand-title">
-            SimCareer 職場大富翁
-            <span class="brand-tag">模擬城市 × 高中英語 A2~B1</span>
+            SimCareer 3D 職場大富翁
+            <span class="brand-tag">模擬城市 3D 立體版 × 高中英語 A2~B1</span>
           </h1>
-          <p class="brand-subtitle">擲骰子探索模擬城市商業區、開口說英文完成打工實習任務、升級你的摩天大樓地標！</p>
+          <p class="brand-subtitle">擲 3D 骰子前進、走到哪裡就挑戰哪棟職場建築！重覆走到同一建築可領分紅並將店面升級為 3D 摩天大樓！</p>
         </div>
       </div>
 
       <!-- SimCity RCI & Player Tycoon Resource Bar -->
       <div class="simcity-stats-hud" aria-label="大富翁與模擬城市狀態列">
-        <div class="sc-stat-chip sc-money" title="完成英語口語任務或經過起點即可獲得職涯資金">
+        <div class="sc-stat-chip sc-money" title="透過擲骰子完成英語口語任務或經過起點獲得職涯資金">
           <span class="sc-stat-icon">💰</span>
           <div>
             <span class="sc-stat-label">職涯資金 (Funds)</span>
@@ -42,7 +42,7 @@
           </div>
         </div>
 
-        <div class="sc-stat-chip sc-buildings" title="在各職場建築拿到 60 分以上即可蓋出大樓並升級">
+        <div class="sc-stat-chip sc-buildings" title="在各職場建築拿到 60/75/85 分可將建築從 Lv.1 升至 Lv.3 摩天大樓">
           <span class="sc-stat-icon">🏢</span>
           <div>
             <span class="sc-stat-label">已開發地標 (Landmarks)</span>
@@ -53,8 +53,8 @@
         <div class="sc-stat-chip sc-day">
           <span class="sc-stat-icon">📅</span>
           <div>
-            <span class="sc-stat-label">職涯回合</span>
-            <strong id="tycoon-day" class="sc-stat-value">Day 1</strong>
+            <span class="sc-stat-label">大富翁回合</span>
+            <strong id="tycoon-day" class="sc-stat-value">Turn 1</strong>
           </div>
         </div>
 
@@ -78,17 +78,20 @@
       <div class="header-Bottom-Row">
         <nav class="main-nav-tabs" aria-label="主要功能切換">
           <button class="nav-tab active" data-view="hub">
-            <span>🗺️ 1. 模擬城市大富翁地圖</span>
+            <span>🎲 1. 模擬城市 3D 大富翁棋盤</span>
           </button>
-          <button class="nav-tab" data-view="studio">
-            <span>🎙️ 2. 職場建築語音對練室</span>
+          <button class="nav-tab" data-view="studio" id="nav-tab-studio">
+            <span>🎙️ 2. 當前職場建築語音對練室</span>
           </button>
           <button class="nav-tab" data-view="evaluation">
-            <span>🏗️ 3. 市長評鑑與建案驗收報告</span>
+            <span>🏗️ 3. 市長評鑑與 3D 建案升級報告</span>
           </button>
         </nav>
 
         <div class="header-actions">
+          <button id="toggle-3d-camera-btn" class="status-pill status-connected" title="切換 3D 模擬城市等距斜角與 3D 俯視角">
+            🎥 視角：3D 模擬城市立體斜角
+          </button>
           <button id="open-api-modal-btn" class="status-pill status-demo">
             🔑 設定 API Key
           </button>
@@ -101,41 +104,42 @@
       <span class="ticker-badge">📡 模擬城市市政快訊</span>
       <div class="ticker-track">
         <span id="simcity-news-ticker" class="ticker-text">
-          🌤️ 模擬城市今日天氣晴朗！商業區「星巴風陽光咖啡館」與「珍珠奶茶台灣旗艦店」急徵英語工讀生，擲骰子或直接點擊建築即可進入語音對練領取豐厚打工獎金！
+          🎲 歡迎來到 SimCareer 3D 職場大富翁！請點擊棋盤中央的「🎲 擲 3D 骰子前進」，走到哪一棟職場大樓就解鎖該棟建築的英語任務；重複走到同一棟大樓可領取營運分紅並挑戰擴建為 Lv.2 旗艦館與 Lv.3 摩天大樓！
         </span>
       </div>
     </div>
 
-    <!-- VIEW 1: SIMCITY RICHMAN BOARD & SCENARIO DESIGNER -->
+    <!-- VIEW 1: 3D SIMCITY RICHMAN BOARD -->
     <main id="view-hub" class="view-section active">
-      <!-- Top Game Board + Right Building Blueprint Layout -->
       <div class="simcity-board-layout">
-        <!-- Left: 5x5 SimCity Isometric Richman Loop Board -->
-        <section class="simcity-map-viewport" aria-label="模擬城市大富翁棋盤">
+        <!-- Left: 3D Isometric SimCity Loop Board -->
+        <section class="simcity-map-viewport" aria-label="模擬城市 3D 大富翁棋盤">
           <div class="map-toolbar">
             <div class="map-toolbar-left">
-              <span class="zone-legend legend-c">🟦 商業打工區 (Commercial)</span>
-              <span class="zone-legend legend-i">🟨 企業實習園區 (Office/Tech)</span>
-              <span class="zone-legend legend-g">🟩 公共文教志工區 (Civic)</span>
-              <span class="zone-legend legend-s">🟪 機會命運／特殊市政</span>
+              <span class="zone-legend legend-c">🟦 商業打工區</span>
+              <span class="zone-legend legend-i">🟨 企業實習園區</span>
+              <span class="zone-legend legend-g">🟩 公共文教志工區</span>
+              <span class="zone-legend legend-s">🟪 機會命運（僅擲骰走到觸發一次）</span>
             </div>
             <div class="map-toolbar-right">
-              <span class="map-hint-pill">💡 玩法：可點中央「🎲 擲骰子前進」，或直接點地圖上任一棟建築開始！</span>
+              <span class="map-hint-pill">🔒 嚴格大富翁規則：僅能靠擲骰子移動，不可任意點選切換關卡或刷錢</span>
             </div>
           </div>
 
-          <!-- 5x5 Grid Perimeter Board + 3x3 Central SimCity Plaza -->
-          <div id="simcity-board-grid" class="simcity-board-grid">
-            <!-- JS populates the 16 perimeter tiles and the central 3x3 SimCity Command Plaza -->
+          <!-- 3D Perspective Stage Container -->
+          <div id="simcity-3d-scene" class="simcity-3d-scene iso-tilted">
+            <div id="simcity-board-grid" class="simcity-board-grid">
+              <!-- Populated by app.js with 3D extruded tiles, 3D multi-story buildings, 3D cube dice, and 3D player pawn -->
+            </div>
           </div>
         </section>
 
-        <!-- Right: Selected Building Blueprint & Scenario Briefing Card -->
+        <!-- Right: Current Landed Building Blueprint & 3-Stage Progression Card -->
         <aside class="hub-preview-panel">
           <div class="preview-sticky-card simcity-blueprint-card">
             <div class="blueprint-top-ribbon">
               <span id="preview-zone-badge" class="badge-zone">🟦 商業區 · 餐飲門市</span>
-              <span id="preview-building-level" class="badge-level">🏗️ Lv.0 待開發店面</span>
+              <span id="preview-building-level" class="badge-level">🏗️ Lv.0 待開發空地</span>
             </div>
 
             <div class="preview-header">
@@ -148,8 +152,15 @@
               </div>
               <div class="preview-reward-strip">
                 <span id="preview-category" class="badge-category">餐飲打工 · 基礎 (CEFR A2)</span>
-                <span id="preview-reward-badge" class="badge-reward">💰 過關獎金 +$1,200</span>
+                <span id="preview-reward-badge" class="badge-reward">💰 本階過關獎金 +$1,200</span>
               </div>
+            </div>
+
+            <!-- NEW: 3-Stage Building Upgrade & Repeat-Visit Development Ladder -->
+            <div class="preview-block stage-ladder-box">
+              <h4>🏗️ 建築三階段發展與「再次走到此格」獎勵機制</h4>
+              <p id="preview-stage-banner" class="stage-current-banner"></p>
+              <div id="preview-stage-ladder" class="stage-ladder-list"></div>
             </div>
 
             <div class="persona-grid">
@@ -165,12 +176,12 @@
             </div>
 
             <div class="preview-block">
-              <h4>📌 職場建築任務背景 (Mission Briefing)</h4>
+              <h4>📌 當前階段任務背景 (Mission Briefing)</h4>
               <p id="preview-background"></p>
             </div>
 
             <div class="preview-block">
-              <h4>🎯 建案驗收過關條件 (開口達成以下 3 點即可升級大樓)</h4>
+              <h4>🎯 本階段建案驗收條件 (Mission Objectives)</h4>
               <ul id="preview-objectives-list" class="objectives-list"></ul>
             </div>
 
@@ -181,28 +192,41 @@
             </div>
 
             <div class="preview-block">
-              <h4>💡 建築通關推薦句型 (點 🔊 可先聽真人示範發音)</h4>
+              <h4>💡 通關推薦句型預習 (點 🔊 可先聽真人示範發音)</h4>
               <div id="preview-phrases-list" class="phrases-preview-list"></div>
             </div>
 
             <div class="preview-cta-row">
               <button id="start-roleplay-from-hub-btn" class="btn-primary-large full-width btn-simcity-enter">
-                🏢 進入此建築開始真人語音任務
+                🎲 請先擲骰子走到職場建築格
               </button>
             </div>
           </div>
         </aside>
       </div>
 
-      <!-- SIMCITY URBAN PLANNING & AI ZONING GENERATOR -->
+      <!-- READ-ONLY BUILDING DEVELOPMENT ATLAS & CLEAR REWARD RULES -->
+      <section class="city-directory-section">
+        <div class="directory-header-row">
+          <div>
+            <h3>🏆 模擬城市 3D 建築發展圖鑑（唯讀總覽：請擲骰子走到該建築格進行挑戰與升級）</h3>
+            <p style="font-size: 0.84rem; color: var(--text-muted); margin-top: 2px;">
+              📌 <strong>重複走到同一建築的進階發展規則</strong>：第 1 次走到過關蓋出 <strong>Lv.1 街邊店</strong> ➔ 第 2 次走到先領 <strong>+$500 營運分紅</strong> 並可挑戰擴建 <strong>Lv.2 旗艦商業大樓</strong> ➔ 第 3 次走到先領 <strong>+$1,000 分紅</strong> 並可挑戰封頂 <strong>Lv.3 黃金摩天大樓地標</strong>！
+            </p>
+          </div>
+        </div>
+        <div id="scenario-cards-grid" class="scenario-cards-grid"></div>
+      </section>
+
+      <!-- TEACHER / AI CUSTOM BUILDING GENERATOR (For Tile #7 New Development Zone) -->
       <section class="ai-generator-banner simcity-zoning-banner">
         <div class="ai-gen-header">
           <div>
-            <h2>🏗️ 模擬城市都市計畫局：AI 一鍵建造專屬職場英語大樓（CEFR A2~B1）</h2>
-            <p>想在地圖上蓋出新的打工或實習場景嗎？輸入一句話（例如：「在電影院打工幫外國觀眾買票與爆米花」），AI 立即為你建造新職場大樓與任務！</p>
+            <h2>🏗️ 教師／都市計畫局專區：為棋盤 #7「新創育成開發特區」設計專屬題庫</h2>
+            <p>在此建立的 AI 或自訂情境會自動進駐棋盤第 #7 號地塊，當學生擲骰子走到第 #7 格時即可挑戰！（不會跳關或切換當前位置）</p>
           </div>
           <button id="open-custom-scenario-btn" class="btn-secondary">
-            🛠️ 手動自訂建築與關卡
+            🛠️ 手動設計 #7 號地塊建築題庫
           </button>
         </div>
 
@@ -210,40 +234,23 @@
           <input
             id="ai-scenario-prompt-input"
             type="text"
-            placeholder="輸入你想建造的職場情境，例如：在市立圖書館或電影院打工，幫外國遊客辦理借書證或買票..."
+            placeholder="輸入想放進棋盤 #7 號開發格的情境，例如：在電影院打工幫外國觀眾買票與推薦爆米花..."
           />
           <button id="ai-generate-scenario-btn" class="btn-accent">
-            ⚡ AI 立即建造新職場大樓
+            ⚡ AI 生成並配置至 #7 號地塊
           </button>
         </div>
 
         <div class="quick-prompts-row">
-          <span class="quick-label">熱門都市建案：</span>
+          <span class="quick-label">快速配置 #7 號地塊主題：</span>
           <button class="quick-prompt-chip" data-prompt="在威秀風電影院打工，幫外國觀眾購買電影票並推薦爆米花套餐">🍿 電影院打工售票處</button>
           <button class="quick-prompt-chip" data-prompt="在青年旅舍櫃檯打工，幫外國背包客辦理入住 Check-in 並介紹附近夜市">🏨 國際青年旅舍櫃檯</button>
           <button class="quick-prompt-chip" data-prompt="在暑期實習時身體不舒服，打電話向實習主管禮貌請病假一天">🏥 向實習主管禮貌請病假</button>
         </div>
       </section>
-
-      <!-- All City Buildings & Custom Scenarios Directory -->
-      <section class="city-directory-section">
-        <div class="directory-header-row">
-          <h3>🏘️ 模擬城市全區職場建築名錄（亦可從此處快速切換情境）</h3>
-          <div class="category-filter-bar">
-            <button class="category-pill active" data-category="全部">全部建築</button>
-            <button class="category-pill" data-category="餐飲打工">🟦 餐飲打工</button>
-            <button class="category-pill" data-category="打工溝通">🟦 打工溝通</button>
-            <button class="category-pill" data-category="實習面試">🟨 實習面試</button>
-            <button class="category-pill" data-category="辦公室實習">🟨 辦公室實習</button>
-            <button class="category-pill" data-category="接待志工">🟩 接待志工</button>
-            <button class="category-pill" data-category="AI 生成情境">🟪 AI 自建大樓</button>
-          </div>
-        </div>
-        <div id="scenario-cards-grid" class="scenario-cards-grid"></div>
-      </section>
     </main>
 
-    <!-- VIEW 2: LIVE VOICE ROLEPLAY STUDIO (INSIDE THE BUILDING) -->
+    <!-- VIEW 2: LIVE VOICE ROLEPLAY STUDIO (INSIDE THE CURRENT LANDED BUILDING) -->
     <main id="view-studio" class="view-section">
       <div class="studio-layout">
         <!-- Left / Center: Building Interior Stage + Voice Orb + Live Transcript Stream -->
@@ -252,6 +259,7 @@
             <div>
               <div class="studio-badges-row">
                 <span id="studio-building-badge" class="building-interior-badge">🏢 當前所在建築：星巴風陽光咖啡館</span>
+                <span id="studio-stage-badge" class="badge-zone">🔨 第一階段：初階店面開張 (目標 60 分)</span>
                 <span id="studio-engine-badge" class="engine-badge">語音引擎：雲端擬真神經語音</span>
               </div>
               <h2 id="studio-scenario-title">情境標題</h2>
@@ -260,7 +268,7 @@
               </p>
             </div>
             <div class="studio-header-right">
-              <button id="back-to-map-btn" class="btn-secondary btn-small">🗺️ 返回城市地圖</button>
+              <button id="back-to-map-btn" class="btn-secondary btn-small">🗺️ 返回 3D 城市棋盤</button>
               <div class="call-timer-box">
                 <span class="timer-dot"></span>
                 <span id="call-timer">00:00</span>
@@ -306,7 +314,7 @@
                 🎙️ 麥克風開啟中
               </button>
               <button id="end-and-evaluate-btn" class="btn-accent" disabled>
-                🏗️ 結束並驗收建築升級與獎金
+                🏗️ 結束並驗收 3D 建築升級與獎金
               </button>
             </div>
           </div>
@@ -330,9 +338,8 @@
           </div>
         </div>
 
-        <!-- Right: Live Coaching HUD (WPM, Fillers, Mission Checklist, Rescue Hints) -->
+        <!-- Right: Live Coaching HUD -->
         <aside class="studio-coaching-hud">
-          <!-- Real-time Pacing & Filler Monitor -->
           <div class="hud-card">
             <h3>⚡ 建築任務即時口語儀表板</h3>
             <div class="hud-metrics-row">
@@ -353,7 +360,7 @@
 
           <!-- Mission Checklist -->
           <div class="hud-card">
-            <h3>🎯 建築升級過關條件 (達成越多獎金越高)</h3>
+            <h3 id="studio-mission-header-title">🎯 建築升級過關條件</h3>
             <div id="studio-mission-list" class="studio-mission-list"></div>
           </div>
 
@@ -374,19 +381,16 @@
       </div>
     </main>
 
-    <!-- VIEW 3: SPEAKING EVALUATION & SIMCITY BUILDING UPGRADE REPORT -->
+    <!-- VIEW 3: SPEAKING EVALUATION & 3D SIMCITY BUILDING UPGRADE REPORT -->
     <main id="view-evaluation" class="view-section">
       <div class="eval-header-bar">
         <div>
-          <h2>🏗️ 模擬城市建案驗收 ＆ 口語表達五維度評鑑報告</h2>
-          <p>根據你剛才實際說出的英文進行毫秒級批改，結算大富翁打工獎金、城市聲望與建築升級等級！</p>
+          <h2>🏗️ 模擬城市 3D 建案驗收 ＆ 口語表達五維度評鑑報告</h2>
+          <p>根據你剛才實際說出的英文進行毫秒級批改，結算大富翁獎金、城市聲望與 3D 建築升級！</p>
         </div>
         <div class="eval-header-actions">
           <button id="eval-back-to-board-btn" class="btn-primary-large">
-            🎲 返回大富翁地圖繼續擲骰子
-          </button>
-          <button id="run-sample-eval-btn" class="btn-secondary">
-            ⚡ 載入範例對話並預覽建案驗收報告
+            🎲 返回 3D 大富翁地圖繼續擲骰子
           </button>
         </div>
       </div>
@@ -395,7 +399,7 @@
         <div class="eval-empty-state">
           <div class="empty-icon">🏙️</div>
           <h3>尚未產生建案驗收與口語評估報告</h3>
-          <p>請先在「1. 模擬城市大富翁地圖」擲骰子或點擊任一建築進入語音對練，或點擊右上角「⚡ 載入範例對話並預覽建案驗收報告」！</p>
+          <p>請先在「1. 模擬城市 3D 大富翁棋盤」擲骰子走到職場建築並完成一段語音對練！</p>
         </div>
       </div>
     </main>
@@ -410,7 +414,7 @@
       </div>
       <div class="modal-body">
         <p class="modal-desc">
-          不填寫金鑰即可直接遊玩「模擬城市職場大富翁」完整語音辨識與即時評鑑！若輸入您的 Google Gemini API Key，則可額外啟用 <strong>Gemini 3.8 Live (`gemini-3.8-live`)</strong> 原生雙向語音串流。金鑰僅儲存在您的瀏覽器本機 (`localStorage`)。
+          不填寫金鑰即可直接遊玩「模擬城市 3D 職場大富翁」完整語音辨識與即時評鑑！若輸入您的 Google Gemini API Key，則可額外啟用 <strong>Gemini 3.8 Live (`gemini-3.8-live`)</strong> 原生雙向語音串流。金鑰僅儲存在您的瀏覽器本機 (`localStorage`)。
         </p>
         <label class="form-field">
           <span>Gemini API Key</span>
@@ -434,7 +438,7 @@
   <div id="custom-scenario-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <div class="modal-card modal-large">
       <div class="modal-header">
-        <h3>🏗️ 模擬城市自訂職場建築設計器 (Custom Building Designer)</h3>
+        <h3>🏗️ 模擬城市 #7 號開發格自訂建築題庫設計器</h3>
         <button id="close-custom-modal-btn" class="btn-close">✕</button>
       </div>
       <form id="custom-scenario-form" class="modal-body form-grid">
@@ -521,22 +525,22 @@
         </label>
 
         <div class="modal-footer span-2">
-          <button type="submit" class="btn-primary-large full-width">🏗️ 建造並啟用此自訂職場建築</button>
+          <button type="submit" class="btn-primary-large full-width">🏗️ 儲存並配置至棋盤 #7 號開發地塊</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- MODAL 3: CHANCE / DESTINY / METRO TRANSIT EVENT MODAL -->
+  <!-- MODAL 3: CHANCE / DESTINY / REPEAT VISIT DIVIDEND MODAL -->
   <div id="board-event-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
     <div class="modal-card richman-event-modal-card">
       <div class="modal-header">
-        <h3 id="event-modal-title">🎲 大富翁城市奇遇事件</h3>
+        <h3 id="event-modal-title">🎲 大富翁城市事件</h3>
         <button id="close-event-modal-btn" class="btn-close">✕</button>
       </div>
       <div id="event-modal-body" class="modal-body"></div>
       <div class="modal-footer">
-        <button id="confirm-event-modal-btn" class="btn-primary-large full-width">太棒了！繼續前進</button>
+        <button id="confirm-event-modal-btn" class="btn-primary-large full-width">收到！繼續前進</button>
       </div>
     </div>
   </div>

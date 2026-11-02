@@ -1,6 +1,59 @@
 (function () {
   window.ExecVoice = window.ExecVoice || {};
 
+  /**
+   * Every workplace building has 3 Progressive Development Stages (三階段都市建設與職涯升遷):
+   * - Stage 0 -> Lv.1 (初階店面開張：目標 60 分，達成至少 1 個任務)
+   * - Stage 1 -> Lv.2 (二階旗艦擴建：再次走到時先領取營運分紅，挑戰進階顧客/主管要求，目標 75 分，達成至少 2 個任務)
+   * - Stage 2 -> Lv.3 (三階摩天大樓地標封頂：再次走到時領取高額分紅，挑戰滿分禮貌表達，目標 85 分，達成全部 3 個任務)
+   */
+  window.ExecVoice.BUILDING_STAGES_CONFIG = [
+    {
+      targetLevel: 1,
+      stageBadge: '🔨 第一階段：初階店面開張 (Lv.0 ➔ Lv.1)',
+      buildingTypeLabel: '一層街邊門市',
+      minScore: 60,
+      minObjectives: 1,
+      arrivalRent: 0,
+      clearRewardMultiplier: 1.0,
+      repReward: 15,
+      stageTaskHint: '開口完成基本接待與回應（總分達 60 分）即可蓋出 Lv.1 初階店面！'
+    },
+    {
+      targetLevel: 2,
+      stageBadge: '🏢 第二階段：旗艦商廈擴建 (Lv.1 ➔ Lv.2)',
+      buildingTypeLabel: '中層玻璃商業大樓',
+      minScore: 75,
+      minObjectives: 2,
+      arrivalRent: 500,
+      clearRewardMultiplier: 1.5,
+      repReward: 30,
+      stageTaskHint: '你已擁有 Lv.1 店面！本次達成 2 項以上任務且總分達 75 分，即可擴建為 Lv.2 旗艦商業大樓！'
+    },
+    {
+      targetLevel: 3,
+      stageBadge: '🏙️ 第三階段：摩天大樓地標封頂 (Lv.2 ➔ Lv.3)',
+      buildingTypeLabel: '超高層摩天輪地標塔',
+      minScore: 85,
+      minObjectives: 3,
+      arrivalRent: 1000,
+      clearRewardMultiplier: 2.2,
+      repReward: 50,
+      stageTaskHint: '挑戰最高等級！完整達成 3 項任務並展現禮貌職場句型（總分達 85 分），即可升級為 Lv.3 發光摩天大樓地標！'
+    },
+    {
+      targetLevel: 3,
+      stageBadge: '👑 頂級地標營運中 (Lv.3 摩天大樓滿級)',
+      buildingTypeLabel: '黃金摩天大樓總部',
+      minScore: 85,
+      minObjectives: 3,
+      arrivalRent: 1600,
+      clearRewardMultiplier: 2.5,
+      repReward: 40,
+      stageTaskHint: '此地標已達最高等級 Lv.3！每次走到可直接領取高額地標營收分紅，再次完成對話可再領績效獎金！'
+    }
+  ];
+
   window.ExecVoice.BUILTIN_SCENARIOS = [
     {
       id: 'cafe-barista-order',
@@ -8,7 +61,10 @@
       buildingSub: 'Starlight Roastery Cafe',
       buildingIcon: '☕',
       zoneType: 'commercial',
-      zoneLabel: '商業區 · 餐飲門市',
+      zoneLabel: '🟦 商業區 · 餐飲門市',
+      roofColor: '#2563eb',
+      wallColorLeft: '#1d4ed8',
+      wallColorRight: '#1e40af',
       baseReward: 1200,
       title: '咖啡廳打工：幫外國客人點餐與處理客製需求',
       category: '餐飲打工',
@@ -20,6 +76,16 @@
       userRole: '咖啡廳工讀生 (Cafe Part-time Staff)',
       background:
         '週末下午你在模擬城市商業區的咖啡廳打工。一位外國客人走進來想點一杯大杯冰拿鐵（Large Iced Latte），但她想把牛奶換成燕麥奶，而且她 10 分鐘後要搭公車，想確認飲料能不能很快做好。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階旗艦店擴建挑戰】尖峰時段外國熟客點餐與推薦點心',
+          extraContext: '🌟 咖啡館已升上 Lv.1，客人變多了！Emma 今天再度光臨，除了點大杯燕麥奶冰拿鐵，還想確認可不可以刷 Apple Pay 快速結帳。'
+        },
+        3: {
+          stageTitle: '【三階摩天咖啡總部封頂挑戰】VIP 外賓精緻點餐與完美禮貌服務',
+          extraContext: '👑 挑戰升級為 Lv.3 摩天咖啡總部！請用最自然、有禮貌的完整句子完成點餐、換燕麥奶報價與製作時間確認。'
+        }
+      },
       objectives: [
         '熱情招呼客人，並重複確認她的點餐內容（大杯冰拿鐵）',
         '清楚回答可以換燕麥奶（Oat milk），並告知價格或加價資訊',
@@ -69,7 +135,10 @@
       buildingSub: 'SimMetro Mart 24H',
       buildingIcon: '🏪',
       zoneType: 'commercial',
-      zoneLabel: '商業區 · 連鎖零售',
+      zoneLabel: '🟦 商業區 · 連鎖零售',
+      roofColor: '#0284c7',
+      wallColorLeft: '#0369a1',
+      wallColorRight: '#075985',
       baseReward: 1400,
       title: '打工排班溝通：因準備學校段考向店長協調換班',
       category: '打工溝通',
@@ -81,6 +150,16 @@
       userRole: '高中生兼職店員 (Part-time Student Staff)',
       background:
         '下週四（Next Thursday）你有重要的學校英文與數學段考（Midterm exams），但班表上你原本排了週三晚上的班。你想向店長 Kevin 禮貌詢問能不能把週三的班換到週六，或是請同事幫忙代班。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階旗艦超商擴建挑戰】段考週排班協調與主動安排代班人選',
+          extraContext: '🌟 超商升上 Lv.1 後生意興隆！請更完整地向店長說明段考時間，並主動告知已協調同事 Amy 代班。'
+        },
+        3: {
+          stageTitle: '【三階超商總部封頂挑戰】高情商排班溝通與周末支援承諾',
+          extraContext: '👑 挑戰升級為 Lv.3 連鎖超商總部地標！請用禮貌且完整的職場句型一次達成所有換班溝通條件。'
+        }
+      },
       objectives: [
         '禮貌向店長說明下週有學校段考（Midterm exam），需要調整排班',
         '明確提出想調整哪一天的班（例如把週三換到週末）',
@@ -126,7 +205,10 @@
       buildingSub: 'SimCity World Expo Hall',
       buildingIcon: '🏛️',
       zoneType: 'civic',
-      zoneLabel: '公共文教區 · 國際展館',
+      zoneLabel: '🟩 公共文教區 · 國際展館',
+      roofColor: '#059669',
+      wallColorLeft: '#047857',
+      wallColorRight: '#065f46',
       baseReward: 1300,
       title: '國際展覽／校園活動志工：為外賓指引方向與介紹流程',
       category: '接待志工',
@@ -138,6 +220,16 @@
       userRole: '活動英文接待志工 (Student Volunteer)',
       background:
         '你擔任模擬城市國際交流展的英文接待志工。一位外國訪客 Liam 剛走進大門，他想先去報到櫃檯領取名牌（Name badge），接著去二樓的主演講廳聽開幕演講。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階國家級展館擴建挑戰】外賓報到動線指引與樓層導覽',
+          extraContext: '🌟 世貿展館已升上 Lv.1，更多國際貴賓抵達！請清楚指引報到櫃檯位置與二樓演講廳路線。'
+        },
+        3: {
+          stageTitle: '【三階世界博覽會地標封頂挑戰】首席青年外交志工全套接待',
+          extraContext: '👑 挑戰升級為 Lv.3 世界博覽會摩天地標！請一次完成迎賓、報到指引、樓層路線與開幕時間提醒。'
+        }
+      },
       objectives: [
         '親切歡迎訪客，並指引報到櫃檯的位置（例如直走左轉）',
         '說明主演講廳在幾樓（例如搭電梯或走樓梯上二樓 Second floor）',
@@ -187,7 +279,10 @@
       buildingSub: 'Sunrise Global Trade Tower',
       buildingIcon: '🏢',
       zoneType: 'industrial',
-      zoneLabel: '商辦園區 · 跨國企業',
+      zoneLabel: '🟨 商辦園區 · 跨國企業',
+      roofColor: '#d97706',
+      wallColorLeft: '#b45309',
+      wallColorRight: '#92400e',
       baseReward: 1500,
       title: '辦公室實習：幫正在開會的主管接電話並留口訊',
       category: '辦公室實習',
@@ -199,6 +294,16 @@
       userRole: '辦公室暑期實習生 (Office Intern)',
       background:
         '你在貿易大樓擔任暑期實習生。你的指導主管 Mr. Lin 目前正在會議室開會（in a meeting），這時桌上的電話響了，外國客戶 David 打電話來想找 Mr. Lin。你需要禮貌說明主管正在開會，並幫客戶記下姓名與聯絡電話。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階跨國商辦擴建挑戰】獨立接聽外國客戶來電與確認回電資訊',
+          extraContext: '🌟 貿易大樓已升上 Lv.1！客戶 David 再次來電確認參訪細節，請展現專業電話禮儀並完整記錄口訊。'
+        },
+        3: {
+          stageTitle: '【三階世貿摩天塔封頂挑戰】金牌行政實習生完美商務電話接待',
+          extraContext: '👑 挑戰升級為 Lv.3 跨國貿易摩天總部！請用最得體的電話英語完成說明、留口訊與回電承諾。'
+        }
+      },
       objectives: [
         '禮貌接聽電話，並說明 Mr. Lin 目前正在開會無法接聽',
         '主動詢問是否可以幫忙留口訊（Take a message）並請教對方姓名',
@@ -244,7 +349,10 @@
       buildingSub: 'SimValley Innovation Hub',
       buildingIcon: '🚀',
       zoneType: 'industrial',
-      zoneLabel: '高科園區 · 新創總部',
+      zoneLabel: '🟨 高科園區 · 新創總部',
+      roofColor: '#ea580c',
+      wallColorLeft: '#c2410c',
+      wallColorRight: '#9a3412',
       baseReward: 1800,
       title: '暑期實習面試：用英文自我介紹與分享社團經驗',
       category: '實習面試',
@@ -256,6 +364,16 @@
       userRole: '應徵暑期實習的高中生 (High School Applicant)',
       background:
         '你正在應徵模擬城市「矽谷新創孵化園區」的高中生暑期體驗實習（Summer Internship）。面試官 Sarah 很親切，想請你簡單自我介紹、分享一個你在學校社團或活動中學到的經驗，以及你希望在實習中學到什麼。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階研發大樓擴建挑戰】複試面談：深入分享社團團隊合作經驗',
+          extraContext: '🌟 園區已升上 Lv.1！進入第二輪面談，請具體分享你在學校社團如何與隊友合作並表達學習熱忱。'
+        },
+        3: {
+          stageTitle: '【三階矽谷未來塔封頂挑戰】決選面試：高自信完整英語表達',
+          extraContext: '👑 挑戰升級為 Lv.3 矽谷科技摩天地標！請自信流暢地完成自我介紹、社團經歷與實習目標。'
+        }
+      },
       objectives: [
         '簡單介紹自己的名字、年級與喜歡的科目或興趣',
         '分享一個學校社團、班級活動或團隊合作的具體經驗',
@@ -301,7 +419,10 @@
       buildingSub: 'Formosa Boba Tea House',
       buildingIcon: '🧋',
       zoneType: 'commercial',
-      zoneLabel: '商業區 · 特色茶飲',
+      zoneLabel: '🟦 商業區 · 特色茶飲',
+      roofColor: '#3b82f6',
+      wallColorLeft: '#2563eb',
+      wallColorRight: '#1d4ed8',
       baseReward: 1300,
       title: '手搖飲店打工：向外國觀光客介紹珍珠奶茶與甜度冰塊',
       category: '餐飲打工',
@@ -313,6 +434,16 @@
       userRole: '手搖飲店工讀生 (Bubble Tea Staff)',
       background:
         '你在模擬城市最熱門的台灣手搖飲店打工。一位外國觀光客 Lucas 想點招牌黑糖珍珠鮮奶茶（Brown Sugar Bubble Milk Tea），但他不知道甜度和冰塊怎麼選最好喝。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階珍奶概念店擴建挑戰】外國觀光團人氣飲品推薦與客製甜度冰塊',
+          extraContext: '🌟 珍奶店已升上 Lv.1！更多外國旅客慕名而來，請流暢推薦黑糖珍珠鮮奶茶並確認半糖少冰與外帶需求。'
+        },
+        3: {
+          stageTitle: '【三階國際茶飲摩天總部封頂挑戰】台灣之光茶飲品牌大使滿分接待',
+          extraContext: '👑 挑戰升級為 Lv.3 國際茶飲摩天大樓！請一次達成飲品介紹、甜度冰塊建議與結帳外帶確認。'
+        }
+      },
       objectives: [
         '熱情推薦招牌珍珠奶茶（Bubble milk tea），並說明裡面的珍珠很有嚼勁',
         '詢問並建議適合的甜度與冰塊（例如半糖少冰 Half sugar, less ice）',
@@ -358,7 +489,10 @@
       buildingSub: 'Apex Creative Media Studio',
       buildingIcon: '🎨',
       zoneType: 'industrial',
-      zoneLabel: '商辦園區 · 設計中心',
+      zoneLabel: '🟨 商辦園區 · 設計中心',
+      roofColor: '#f59e0b',
+      wallColorLeft: '#d97706',
+      wallColorRight: '#b45309',
       baseReward: 1700,
       title: '實習生週會：向實習導師回報海報進度與請教問題',
       category: '辦公室實習',
@@ -370,6 +504,16 @@
       userRole: '行銷部高中實習生 (Marketing Intern)',
       background:
         '你在創意媒體大樓的行銷部門實習，導師 Chloe 請你幫忙設計一張社群活動宣傳圖（Social media poster）。你已經完成了圖片排版，但不確定英文標語（Slogan）字體大小跟公司 Logo 要放哪個角落，需要向她回報進度並請她給建議。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階數位媒體中心擴建挑戰】專案進度發表與跨部門設計請益',
+          extraContext: '🌟 媒體大樓已升上 Lv.1！導師 Chloe 期待聽到更完整的初稿進度回報與具體的排版問題。'
+        },
+        3: {
+          stageTitle: '【三階創意摩天塔封頂挑戰】首席青年設計師提案與專業回饋交流',
+          extraContext: '👑 挑戰升級為 Lv.3 創意數位媒體摩天總部！請完整回報進度、提出 Logo 與字體疑問並禮貌請求導師 Feedback。'
+        }
+      },
       objectives: [
         '向導師回報目前已經完成的部分（例如已經完成第一版海報排版）',
         '清楚提出你不確定的地方（例如 Logo 位置或標題字體大小）',
@@ -415,7 +559,10 @@
       buildingSub: 'SimCity Global Bookstore',
       buildingIcon: '📚',
       zoneType: 'civic',
-      zoneLabel: '公共文教區 · 複合書城',
+      zoneLabel: '🟩 公共文教區 · 複合書城',
+      roofColor: '#10b981',
+      wallColorLeft: '#059669',
+      wallColorRight: '#047857',
       baseReward: 1400,
       title: '書店打工：幫外國讀者查詢英文小說庫存與指引結帳',
       category: '打工溝通',
@@ -427,6 +574,16 @@
       userRole: '書店兼職店員 (Bookstore Part-time Staff)',
       background:
         '你在模擬城市文化書城打工。一位外國客人 Olivia 走過來詢問是否有英文版《台灣旅遊指南（Taiwan Travel Guide）》庫存，並想知道在哪裡結帳以及有沒有禮物包裝服務。',
+      stageVariations: {
+        2: {
+          stageTitle: '【二階文化旗艦館擴建挑戰】外文書區導覽與免費禮品包裝服務',
+          extraContext: '🌟 文化書城已升上 Lv.1！請清楚幫客人查庫存、帶路到 B 區書架並介紹櫃檯免費禮物包裝。'
+        },
+        3: {
+          stageTitle: '【三階城市文化摩天地標封頂挑戰】星級外文書店顧問完美應對',
+          extraContext: '👑 挑戰升級為 Lv.3 國際文化書城摩天地標！請用自然完整的英文句子一次達成所有服務目標。'
+        }
+      },
       objectives: [
         '親切回應客人，表示電腦顯示目前還有庫存（In stock）',
         '指引她該書放在哪一區（例如在 B 區旅遊書架 Section B, Travel shelf）',
@@ -469,12 +626,7 @@
   ];
 
   /**
-   * 16-Tile Classic Richman / Monopoly Board Layout in SimCity Style
-   * Arranged clockwise around a 5x5 grid perimeter:
-   * Top row:    0,  1,  2,  3,  4
-   * Right col:  5,  6,  7
-   * Bottom row: 8,  9, 10, 11, 12 (right-to-left)
-   * Left col:  13, 14, 15 (bottom-to-top)
+   * 16-Tile Classic Richman / Monopoly Board Layout in SimCity 3D Style
    */
   window.ExecVoice.BOARD_TILES = [
     {
@@ -487,7 +639,7 @@
       icon: '🏛️',
       zoneColor: '#10b981',
       rewardText: '經過領 +$1,000',
-      description: '模擬城市起點與市政廳！每次經過或停留皆可領取青年職涯津貼 $1,000。'
+      description: '模擬城市市政廳起點！每次擲骰子經過或停留可領取青年職涯津貼 $1,000。'
     },
     {
       index: 1,
@@ -500,7 +652,7 @@
       icon: '☕',
       zoneType: 'commercial',
       zoneColor: '#3b82f6',
-      rewardText: '過關獎金 $1,200'
+      rewardText: '基礎獎金 $1,200'
     },
     {
       index: 2,
@@ -511,8 +663,8 @@
       subName: 'CHANCE & DESTINY',
       icon: '❓',
       zoneColor: '#f59e0b',
-      rewardText: '隨機職場奇遇',
-      description: '翻開大富翁機會命運卡！回答簡單職場英語小問題或領取市民創業基金。'
+      rewardText: '擲骰走到觸發一次',
+      description: '擲骰子走到此格時，自動翻開一張大富翁機會命運卡！（點擊地圖不會重複給錢）'
     },
     {
       index: 3,
@@ -525,7 +677,7 @@
       icon: '🏪',
       zoneType: 'commercial',
       zoneColor: '#3b82f6',
-      rewardText: '過關獎金 $1,400'
+      rewardText: '基礎獎金 $1,400'
     },
     {
       index: 4,
@@ -533,11 +685,11 @@
       gridCol: 5,
       type: 'corner-transit',
       name: '模擬城市捷運總站',
-      subName: 'METRO TRANSIT HUB',
+      subName: 'METRO EXPRESS',
       icon: '🚇',
       zoneColor: '#06b6d4',
-      rewardText: '免費直達任一建築',
-      description: '搭乘模擬城市高速捷運！可任選地圖上任一棟職場大樓立即傳送過去。'
+      rewardText: '自動轉乘至下一建築',
+      description: '擲骰子抵達捷運站時，系統將自動為你安排特快列車前往下一座待升遷的職場建築！'
     },
     {
       index: 5,
@@ -550,20 +702,20 @@
       icon: '🏛️',
       zoneType: 'civic',
       zoneColor: '#10b981',
-      rewardText: '過關獎金 $1,300'
+      rewardText: '基礎獎金 $1,300'
     },
     {
       index: 6,
       gridRow: 3,
       gridCol: 5,
       type: 'ai-lot',
-      name: '新興商業開發地塊',
-      subName: 'AI CUSTOM ZONING LOT',
+      name: '新創育成開發特區',
+      subName: 'AI CUSTOM TOWER',
       icon: '🏗️',
       zoneType: 'special',
       zoneColor: '#8b5cf6',
-      rewardText: 'AI 自訂建造大樓',
-      description: '模擬城市自由規劃地塊！可用 AI 輸入一句話自動蓋出你想練習的專屬職場大樓。'
+      rewardText: 'AI 建造或挑戰新樓',
+      description: '擲骰子抵達此開發區時，可挑戰老師／AI 新建的職場大樓！'
     },
     {
       index: 7,
@@ -576,7 +728,7 @@
       icon: '🏢',
       zoneType: 'industrial',
       zoneColor: '#f59e0b',
-      rewardText: '過關獎金 $1,500'
+      rewardText: '基礎獎金 $1,500'
     },
     {
       index: 8,
@@ -587,8 +739,8 @@
       subName: 'CENTRAL PARK PLAZA',
       icon: '🌳',
       zoneColor: '#10b981',
-      rewardText: '英語角獎學金 +$600',
-      description: '在中央公園與外國交換生聊天充電！獲得青年國際交流獎學金 $600。'
+      rewardText: '走到領獎學金 +$600',
+      description: '擲骰子走到中央公園時，與外國交換生交流獲得 $600 獎學金。'
     },
     {
       index: 9,
@@ -601,7 +753,7 @@
       icon: '🚀',
       zoneType: 'industrial',
       zoneColor: '#f59e0b',
-      rewardText: '過關獎金 $1,800'
+      rewardText: '基礎獎金 $1,800'
     },
     {
       index: 10,
@@ -612,8 +764,8 @@
       subName: 'SIMCITY NEWS EVENT',
       icon: '📺',
       zoneColor: '#ec4899',
-      rewardText: '突發新聞獎勵',
-      description: '上了模擬城市地方新聞頭條！觸發隨機英語職場好運事件。'
+      rewardText: '擲骰走到觸發一次',
+      description: '擲骰子走到新聞台時，隨機觸發模擬城市英語好運事件！'
     },
     {
       index: 11,
@@ -626,19 +778,19 @@
       icon: '🧋',
       zoneType: 'commercial',
       zoneColor: '#3b82f6',
-      rewardText: '過關獎金 $1,300'
+      rewardText: '基礎獎金 $1,300'
     },
     {
       index: 12,
       gridRow: 5,
       gridCol: 1,
       type: 'corner-builder',
-      name: '都市計畫與建設局',
-      subName: 'CITY PLANNING BUREAU',
-      icon: '📐',
+      name: '市政職涯獎勵局',
+      subName: 'CAREER BONUS HALL',
+      icon: '🏆',
       zoneColor: '#8b5cf6',
-      rewardText: '新增自訂職場建築',
-      description: '模擬城市都市計畫局！可在此使用 AI 一鍵新建職場情境大樓或手動設計關卡。'
+      rewardText: '按建築數領發展津貼',
+      description: '擲骰子走到市政獎勵局時，根據你目前已蓋出的職場大樓數量發放城市建設分紅！'
     },
     {
       index: 13,
@@ -651,7 +803,7 @@
       icon: '🎨',
       zoneType: 'industrial',
       zoneColor: '#f59e0b',
-      rewardText: '過關獎金 $1,700'
+      rewardText: '基礎獎金 $1,700'
     },
     {
       index: 14,
@@ -662,8 +814,8 @@
       subName: 'SPEAKING ACADEMY',
       icon: '🎓',
       zoneColor: '#06b6d4',
-      rewardText: '領取高分口語秘笈',
-      description: '模擬城市語言中心！免費獲得一張「萬用禮貌職場英語金句卡」並領取 $500 勤學獎金。'
+      rewardText: '走到領助學金 +$500',
+      description: '擲骰子走到進修學院時，免費獲得一張萬用禮貌職場英語金句卡與 $500 助學金。'
     },
     {
       index: 15,
@@ -676,14 +828,14 @@
       icon: '📚',
       zoneType: 'civic',
       zoneColor: '#10b981',
-      rewardText: '過關獎金 $1,400'
+      rewardText: '基礎獎金 $1,400'
     }
   ];
 
   window.ExecVoice.CHANCE_CARDS = [
     {
       title: '🌟 機會卡：外國客人誇獎你的英文很親切！',
-      desc: '你在門市打工時主動用 "Welcome! How can I help you today?" 招呼外國遊客，獲得Google五星好評與店長獎金！',
+      desc: '你在門市打工時主動用 "Welcome! How can I help you today?" 招呼外國遊客，獲得五星好評與店長獎金！',
       tipEn: 'Welcome! How can I help you today?',
       tipZh: '歡迎光臨！請問今天有什麼我可以幫您的嗎？',
       moneyDelta: 800,

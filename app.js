@@ -363,6 +363,17 @@
         });
       });
 
+      // 3D Camera Tilt View Toggle
+      const toggleCameraBtn = document.getElementById('toggle-3d-camera-btn');
+      const scene3D = document.getElementById('simcity-3d-scene');
+      toggleCameraBtn?.addEventListener('click', () => {
+        const isTilted = scene3D?.classList.toggle('iso-tilted');
+        scene3D?.classList.toggle('flat-view', !isTilted);
+        toggleCameraBtn.textContent = isTilted
+          ? '🎥 視角：3D 模擬城市立體斜角'
+          : '🎥 視角：2D 頂視俯瞰平視角';
+      });
+
       document.getElementById('back-to-map-btn')?.addEventListener('click', () => {
         this.switchView('hub');
       });
@@ -450,7 +461,18 @@
         this.handleSaveCustomScenario();
       });
 
+      // Enter building button: only permitted when player is currently at that building!
       document.getElementById('start-roleplay-from-hub-btn')?.addEventListener('click', () => {
+        const curTile = BOARD_TILES[this.tycoon.playerTileIndex];
+        const isAtBuilding =
+          (curTile?.scenarioId === this.selectedScenario?.id) ||
+          (curTile?.type === 'ai-lot' && this.selectedScenario?.id?.startsWith('ai-'));
+
+        if (!isAtBuilding) {
+          this.showToast(`🎲 請先擲 3D 骰子走到此建築才能開始任務！（你目前在 #${this.tycoon.playerTileIndex + 1} 格）`);
+          return;
+        }
+
         this.switchView('studio');
         this.startVoiceCall();
       });
@@ -533,18 +555,15 @@
     }
 
     /**
-     * Renders the 5x5 SimCity Isometric Richman Loop Board + Central 3x3 Dice Plaza
+     * Renders the 5x5 SimCity 3D Richman Board + 3D Extruded Buildings + 3D Rolling Dice Cube
      */
     renderSimCityBoard() {
       const grid = document.getElementById('simcity-board-grid');
       if (!grid || !BOARD_TILES) return;
 
-      const diceFaces = ['⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
-      const currentDiceChar = diceFaces[(this.lastDiceValue - 1) % 6] || '⚅';
-      const currentTile = BOARD_TILES[this.tycoon.playerTileIndex] || BOARD_TILES[0];
+      const currentLandedTile = BOARD_TILES[this.tycoon.playerTileIndex] || BOARD_TILES[0];
 
       const tilesHtml = BOARD_TILES.map((tile) => {
-        // If this is the custom AI lot and the user has created a custom scenario, bind it dynamically!
         let scenarioObj = null;
         if (tile.type === 'scenario') {
           scenarioObj = this.allScenarios.find((s) => s.id === tile.scenarioId);
@@ -565,13 +584,76 @@
 
         const displayTitle = scenarioObj?.buildingName || tile.name;
         const displaySub = scenarioObj?.buildingSub || tile.subName;
-        const displayIcon =
-          bldLevel >= 3
-            ? '🏙️'
-            : scenarioObj?.buildingIcon || tile.icon;
+        const displayIcon = scenarioObj?.buildingIcon || tile.icon;
         const displayReward = scenarioObj
-          ? `獎金 $${(scenarioObj.baseReward || 1200).toLocaleString()}`
+          ? `Lv.${bldLevel} · 獎金 $${(scenarioObj.baseReward || 1200).toLocaleString()}`
           : tile.rewardText;
+
+        // 3D Architectural Facade Model
+        let bld3DHtml = '';
+        if (tile.type === 'scenario' || tile.type === 'ai-lot') {
+          if (bldLevel === 0) {
+            bld3DHtml = `
+              <div class="bld-3d-model lv-0" title="未開發地皮 (待建案開工)">
+                <div class="bld-3d-facade">
+                  <span>🚧</span>
+                </div>
+              </div>
+            `;
+          } else if (bldLevel === 1) {
+            bld3DHtml = `
+              <div class="bld-3d-model lv-1" title="Lv.1 街邊門市 (★☆☆)">
+                <div class="bld-3d-facade">
+                  <span class="bld-emoji">${displayIcon}</span>
+                  <div class="bld-windows-grid">
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                  </div>
+                </div>
+              </div>
+            `;
+          } else if (bldLevel === 2) {
+            bld3DHtml = `
+              <div class="bld-3d-model lv-2" title="Lv.2 旗艦商業大樓 (★★☆)">
+                <div class="bld-3d-facade">
+                  <span class="bld-emoji">${displayIcon}</span>
+                  <div class="bld-windows-grid">
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                  </div>
+                </div>
+              </div>
+            `;
+          } else {
+            bld3DHtml = `
+              <div class="bld-3d-model lv-3" title="Lv.3 摩天大樓地標 (★★★)">
+                <div class="bld-3d-antenna"></div>
+                <div class="bld-3d-facade">
+                  <span class="bld-emoji">🏙️</span>
+                  <div class="bld-windows-grid">
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                    <span class="bld-window-pane"></span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+        } else {
+          // Special corner or chance tile 3D token
+          bld3DHtml = `
+            <div class="bld-3d-model lv-special">
+              <div class="bld-3d-facade" style="border-color:${tile.zoneColor};">
+                <span style="font-size:1.65rem;">${displayIcon}</span>
+              </div>
+            </div>
+          `;
+        }
 
         return `
           <div
@@ -580,10 +662,14 @@
             }"
             style="grid-row: ${tile.gridRow}; grid-column: ${tile.gridCol};"
             data-tile-index="${tile.index}"
+            title="點擊預覽此建築任務藍圖（僅能靠擲骰子移動挑戰）"
           >
             ${
               isPlayerHere
-                ? `<div class="player-pawn-token" title="你目前所在位置"><span class="player-pawn-emoji">🧑‍🎓</span><span>YOU</span></div>`
+                ? `<div class="player-pawn-token-3d" title="你目前所在位置">
+                     <div class="pawn-avatar-badge"><span>🧑‍🎓</span><span>YOU</span></div>
+                     <div class="pawn-shadow-ellipse"></div>
+                   </div>`
                 : ''
             }
             <div class="tile-roof-bar" style="background: ${tile.zoneColor || '#3b82f6'};">
@@ -592,7 +678,7 @@
             </div>
 
             <div class="tile-building-body">
-              <div class="tile-building-3d">${displayIcon}</div>
+              ${bld3DHtml}
               <div class="tile-title">${this.escapeHtml(displayTitle)}</div>
               <div class="tile-sub">${this.escapeHtml(displaySub)}</div>
             </div>
@@ -602,14 +688,13 @@
         `;
       }).join('');
 
-      const activeBldName = this.selectedScenario?.buildingName || this.selectedScenario?.title || currentTile.name;
-
+      // Central Command Plaza with 3D Rolling Dice Cube
       const centerPlazaHtml = `
         <div class="simcity-center-plaza">
           <div class="plaza-skyline-header">
             <div class="plaza-title-group">
               <h3>🏙️ 模擬城市中央指揮廣場 (SimCity Central Plaza)</h3>
-              <p>擲骰子環遊商業與科技園區，完成英語任務即可買地蓋樓、賺取職涯獎金！</p>
+              <p>嚴格大富翁機制：擲 3D 骰子前進，走到哪就挑戰哪棟建築！重複走到可領營運分紅並擴建摩天大樓！</p>
             </div>
             <div class="plaza-skyline-mini" aria-hidden="true">
               <span>🌲</span><span>🏠</span><span>🏢</span><span>🏙️</span><span>🎡</span><span>🌳</span>
@@ -617,42 +702,46 @@
           </div>
 
           <div class="plaza-dice-arena">
-            <div id="dice-3d-box" class="dice-3d-box ${this.isRollingDice ? 'rolling' : ''}" title="點擊擲骰子">
-              ${currentDiceChar}
+            <div class="dice-3d-scene-wrap" id="dice-3d-trigger" title="點擊擲 3D 骰子">
+              <div id="dice-3d-cube" class="dice-3d-cube ${this.isRollingDice ? 'rolling' : ''}">
+                <div class="cube-face face-1">⚀</div>
+                <div class="cube-face face-2">⚁</div>
+                <div class="cube-face face-3">⚂</div>
+                <div class="cube-face face-4">⚃</div>
+                <div class="cube-face face-5">⚄</div>
+                <div class="cube-face face-6">⚅</div>
+              </div>
             </div>
             <div class="dice-controls-col">
               <button id="roll-dice-btn" class="btn-roll-dice" ${this.isRollingDice ? 'disabled' : ''}>
-                🎲 ${this.isRollingDice ? '角色前進中...' : '擲骰子前進 (Roll Dice)'}
+                🎲 ${this.isRollingDice ? '3D 骰子旋轉前進中...' : '擲 3D 骰子前進 (Roll 3D Dice)'}
               </button>
-              <div class="remote-dice-bar">
-                <span class="remote-dice-label">🎯 遙控骰子指定步數：</span>
-                ${[1, 2, 3, 4, 5, 6]
-                  .map(
-                    (step) =>
-                      `<button type="button" class="btn-remote-step" data-step="${step}" ${
-                        this.isRollingDice ? 'disabled' : ''
-                      }>${step}</button>`
-                  )
-                  .join('')}
-              </div>
+              <span class="dice-rule-badge">🔒 每次擲骰由系統公平產生 1~6 步數</span>
             </div>
           </div>
 
           <div class="plaza-tile-status-card">
             <div class="plaza-status-info">
               <div class="plaza-status-title">
-                📍 當前鎖定職場地標：${this.escapeHtml(activeBldName)}
+                📍 玩家目前所在位置：#${currentLandedTile.index + 1} ${this.escapeHtml(currentLandedTile.name)}
               </div>
               <div class="plaza-status-desc">
-                對象：${this.escapeHtml(this.selectedScenario?.aiName || '')}（${this.escapeHtml(
-                  this.selectedScenario?.aiRole || ''
-                )}）｜ 達成 60 分以上即可升級建築並領取 $${(
-                  this.selectedScenario?.baseReward || 1200
-                ).toLocaleString()}！
+                ${
+                  currentLandedTile.type === 'scenario' || currentLandedTile.type === 'ai-lot'
+                    ? `當前建築目標：<strong>${this.escapeHtml(
+                        this.selectedScenario?.buildingName || this.selectedScenario?.title || ''
+                      )}</strong> ｜ 點擊右方綠色按鈕即可開口進行英語驗收挑戰！`
+                    : `當前停留於非建築格（${currentLandedTile.description || currentLandedTile.rewardText}），請擲 3D 骰子前進以進入職場建築！`
+                }
               </div>
             </div>
-            <button id="plaza-enter-studio-btn" type="button" class="btn-plaza-enter">
-              🎙️ 進入建築開始對話
+            <button
+              id="plaza-enter-studio-btn"
+              type="button"
+              class="btn-plaza-enter"
+              ${currentLandedTile.type !== 'scenario' && currentLandedTile.type !== 'ai-lot' ? 'disabled' : ''}
+            >
+              🎙️ 進入當前建築開始任務
             </button>
           </div>
         </div>
@@ -660,54 +749,92 @@
 
       grid.innerHTML = tilesHtml + centerPlazaHtml;
 
-      // Bind tile click handlers
+      // Bind Tile Click for PREVIEW INSPECTION ONLY (Students CANNOT click to move or farm money!)
       grid.querySelectorAll('.board-tile').forEach((tileEl) => {
         tileEl.addEventListener('click', () => {
           if (this.isRollingDice) return;
           const idx = Number(tileEl.dataset.tileIndex);
-          this.tycoon.playerTileIndex = idx;
-          this.saveTycoonState();
-          playGameSfx('step');
-          this.handleLandOnTile(idx, true);
+          const clickedTile = BOARD_TILES[idx];
+          if (!clickedTile) return;
+
+          let scenarioObj = null;
+          if (clickedTile.type === 'scenario') {
+            scenarioObj = this.allScenarios.find((s) => s.id === clickedTile.scenarioId);
+          } else if (clickedTile.type === 'ai-lot' && this.customScenarios.length > 0) {
+            scenarioObj = this.customScenarios[0];
+          }
+
+          if (scenarioObj) {
+            this.selectedScenario = scenarioObj;
+            this.renderSimCityBoard();
+            this.renderSelectedScenarioPreview();
+          } else {
+            this.showToast(`📌 [#${idx + 1} ${clickedTile.name}]：${clickedTile.description || clickedTile.rewardText}`);
+          }
         });
       });
 
-      // Bind dice roll & remote dice handlers
+      // Bind 3D Dice Roll Handlers
       document.getElementById('roll-dice-btn')?.addEventListener('click', () => {
         this.rollRichmanDice();
       });
-      document.getElementById('dice-3d-box')?.addEventListener('click', () => {
+      document.getElementById('dice-3d-trigger')?.addEventListener('click', () => {
         this.rollRichmanDice();
-      });
-      grid.querySelectorAll('.btn-remote-step').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const step = Number(btn.dataset.step);
-          this.rollRichmanDice(step);
-        });
       });
 
       document.getElementById('plaza-enter-studio-btn')?.addEventListener('click', () => {
+        const curTile = BOARD_TILES[this.tycoon.playerTileIndex];
+        if (curTile?.type !== 'scenario' && curTile?.type !== 'ai-lot') {
+          this.showToast('🎲 請先擲 3D 骰子走到職場建築格！');
+          return;
+        }
         this.switchView('studio');
         this.startVoiceCall();
       });
     }
 
-    async rollRichmanDice(forcedSteps = null) {
+    /**
+     * Fair 3D Dice Roll with 3D cube tumbling animation and step-by-step pawn movement
+     */
+    async rollRichmanDice() {
       if (this.isRollingDice) return;
       this.isRollingDice = true;
 
-      const steps = forcedSteps || Math.floor(Math.random() * 6) + 1;
+      const steps = Math.floor(Math.random() * 6) + 1;
       this.lastDiceValue = steps;
       playGameSfx('dice');
-      this.renderSimCityBoard();
 
-      await new Promise((r) => setTimeout(r, 380));
+      const cubeEl = document.getElementById('dice-3d-cube');
+      cubeEl?.classList.add('rolling');
 
+      const faceRotations = {
+        1: 'rotateX(0deg) rotateY(0deg)',
+        2: 'rotateX(0deg) rotateY(-90deg)',
+        3: 'rotateX(0deg) rotateY(-180deg)',
+        4: 'rotateX(0deg) rotateY(90deg)',
+        5: 'rotateX(-90deg) rotateY(0deg)',
+        6: 'rotateX(90deg) rotateY(0deg)'
+      };
+
+      const rollBtn = document.getElementById('roll-dice-btn');
+      if (rollBtn) {
+        rollBtn.disabled = true;
+        rollBtn.textContent = '🎲 3D 骰子旋轉中...';
+      }
+
+      await new Promise((r) => setTimeout(r, 650));
+      cubeEl?.classList.remove('rolling');
+      if (cubeEl && faceRotations[steps]) {
+        cubeEl.style.transform = faceRotations[steps];
+      }
+
+      await new Promise((r) => setTimeout(r, 200));
+
+      // Step-by-step 3D pawn movement
       for (let i = 1; i <= steps; i++) {
         this.tycoon.playerTileIndex = (this.tycoon.playerTileIndex + 1) % BOARD_TILES.length;
         playGameSfx('step');
 
-        // Check if player passed or landed on START (Tile 0: Payday)
         if (this.tycoon.playerTileIndex === 0) {
           this.tycoon.money += 1000;
           this.tycoon.day += 1;
@@ -716,7 +843,7 @@
         }
 
         this.renderSimCityBoard();
-        await new Promise((r) => setTimeout(r, 175));
+        await new Promise((r) => setTimeout(r, 220));
       }
 
       this.isRollingDice = false;
@@ -726,6 +853,9 @@
       this.handleLandOnTile(this.tycoon.playerTileIndex, false);
     }
 
+    /**
+     * Handles landing on a tile via DICE ONLY (Never via direct click!)
+     */
     handleLandOnTile(tileIndex, isDirectClick = false) {
       const tile = BOARD_TILES[tileIndex];
       if (!tile) return;
@@ -734,20 +864,46 @@
         const found = this.allScenarios.find((s) => s.id === tile.scenarioId);
         if (found) {
           this.selectedScenario = found;
+          const currentLevel = this.tycoon.buildingLevels[found.id] || 0;
+          const stageConfig = window.ExecVoice.BUILDING_STAGES_CONFIG[Math.min(currentLevel, 3)];
+
+          // IF ALREADY BUILT: PAY INSTANT REPEAT-VISIT DIVIDEND!
+          if (currentLevel > 0) {
+            const dividend = stageConfig.arrivalRent || 500;
+            this.tycoon.money += dividend;
+            this.tycoon.reputation += 10;
+            this.saveTycoonState();
+            playGameSfx('payday');
+
+            this.showRichmanEventModal(
+              `🏢 重訪「${found.buildingName}」· 領取營運分紅！`,
+              `
+                <p style="margin-bottom:12px; color:#cbd5e1;">
+                  你再次抵達了你所開發的 <strong>${this.escapeHtml(found.buildingName)} (Lv.${currentLevel})</strong>！
+                </p>
+                <div style="background:rgba(250,204,21,0.15); border:1.5px solid #fde047; border-radius:12px; padding:14px; margin-bottom:12px;">
+                  <div style="font-size:0.8rem; color:#fef08a; font-weight:800;">💰 再次抵達門市營運分紅：</div>
+                  <p style="font-size:1.35rem; font-weight:900; color:#fde047; margin-top:4px;">+$${dividend.toLocaleString()} 元</p>
+                  <p style="font-size:0.82rem; color:#cbd5e1; margin-top:4px;">
+                    下一個發展目標：<strong>${stageConfig.stageBadge}</strong>！完成口語對話驗收，即可擴建為更高聳的摩天大樓！
+                  </p>
+                </div>
+              `
+            );
+          } else {
+            playGameSfx('event');
+            this.showToast(
+              `🎲 抵達「${found.buildingName}」！點擊右側「🏢 進入此建築挑戰」即可開工挑戰！`
+            );
+          }
+
           this.renderSimCityBoard();
           this.renderScenarioList();
           this.renderSelectedScenarioPreview();
           this.populateStudioHeader();
           this.setSimCityNewsTicker(
-            `📍 你抵達了「${found.buildingName || found.title}」！NPC ${found.aiName} 正在等你開口對話，過關可獲 $${(
-              found.baseReward || 1200
-            ).toLocaleString()}！`
+            `📍 你抵達了「${found.buildingName}」！NPC ${found.aiName} 正在等你對話，通關可升級建築並領取獎金！`
           );
-          if (!isDirectClick) {
-            this.showToast(
-              `🎲 抵達「${found.buildingName}」！點擊右側或中央「🎙️ 進入建築開始對話」即可挑戰！`
-            );
-          }
         }
         return;
       }
@@ -759,14 +915,24 @@
           this.renderScenarioList();
           this.renderSelectedScenarioPreview();
           this.populateStudioHeader();
-          this.showToast(`🏗️ 抵達你自建的「${this.selectedScenario.title}」！`);
+          this.showToast(`🏗️ 抵達自建專區「${this.selectedScenario.title}」！`);
           return;
         }
         playGameSfx('event');
-        const inputEl = document.getElementById('ai-scenario-prompt-input');
-        inputEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        inputEl?.focus();
-        this.showToast('🏗️ 抵達模擬城市開發區！可在下方輸入一句話讓 AI 幫你蓋出新職場大樓！');
+        const bonus = 800;
+        this.tycoon.money += bonus;
+        this.tycoon.reputation += 15;
+        this.saveTycoonState();
+        this.showRichmanEventModal(
+          `🏆 抵達「${tile.name}」· 市政青年津貼！`,
+          `
+            <p style="margin-bottom:12px; color:#cbd5e1;">你抵達了模擬城市 ${tile.name}，市長頒發青年職涯創業補助！</p>
+            <div style="background:rgba(16,185,129,0.15); border:1.5px solid #34d399; border-radius:12px; padding:14px; margin-bottom:12px;">
+              <span class="badge-reward" style="font-size:1rem;">💰 職涯資金 +$${bonus}</span>
+              <p style="font-size:0.82rem; color:#a7f3d0; margin-top:8px;">提示：可在下方專區讓 AI 為此地塊生成新建築！</p>
+            </div>
+          `
+        );
         return;
       }
 
@@ -782,7 +948,7 @@
           `
             <p style="margin-bottom:12px; color:#cbd5e1;">${this.escapeHtml(card.desc)}</p>
             <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.4); border-radius:10px; padding:12px; margin-bottom:12px;">
-              <div style="font-size:0.78rem; color:#6ee7b7; font-weight:700;">💡 順便學一句大富翁職場金句：</div>
+              <div style="font-size:0.78rem; color:#6ee7b7; font-weight:700;">💡 大富翁職場必勝金句：</div>
               <p style="font-size:1rem; font-weight:800; color:#fff; margin-top:4px;">"${this.escapeHtml(card.tipEn)}"</p>
               <p style="font-size:0.84rem; color:#94a3b8;">${this.escapeHtml(card.tipZh)}</p>
               <button type="button" id="event-card-tts-btn" class="btn-secondary" style="margin-top:8px; padding:5px 12px; font-size:0.8rem;">🔊 聽真人發音</button>
@@ -803,36 +969,29 @@
 
       if (tile.type === 'corner-transit') {
         playGameSfx('event');
-        const buildingTiles = BOARD_TILES.filter((t) => t.type === 'scenario');
-        this.showRichmanEventModal(
-          '🚇 模擬城市捷運總站 (免費直達專車)',
-          `
-            <p style="margin-bottom:12px; color:#cbd5e1;">歡迎搭乘模擬城市捷運！請選擇你想直接前往挑戰的職場建築：</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              ${buildingTiles
-                .map(
-                  (bt) => `
-                  <button type="button" class="btn-secondary metro-jump-btn" data-target-idx="${bt.index}" style="text-align:left; display:flex; align-items:center; gap:8px;">
-                    <span style="font-size:1.3rem;">${bt.icon}</span>
-                    <span><strong>${this.escapeHtml(bt.name)}</strong><br/><small style="color:#94a3b8;">${this.escapeHtml(bt.rewardText)}</small></span>
-                  </button>
-                `
-                )
-                .join('')}
-            </div>
-          `,
-          () => {
-            document.querySelectorAll('.metro-jump-btn').forEach((btn) => {
-              btn.addEventListener('click', () => {
-                const targetIdx = Number(btn.dataset.targetIdx);
-                document.getElementById('board-event-modal')?.classList.add('hidden');
-                this.tycoon.playerTileIndex = targetIdx;
+        const nextTarget = BOARD_TILES.find((t, i) => i > tileIndex && (t.type === 'scenario' || t.type === 'ai-lot')) ||
+                           BOARD_TILES.find((t) => t.type === 'scenario');
+        if (nextTarget) {
+          this.showRichmanEventModal(
+            '🚇 模擬城市捷運特快車發車！',
+            `
+              <p style="margin-bottom:12px; color:#cbd5e1;">
+                歡迎搭乘模擬城市捷運！列車即將直達下一座熱門職場大樓：<strong>${this.escapeHtml(nextTarget.name)}</strong>！
+              </p>
+            `,
+            () => {
+              const confirmBtn = document.getElementById('confirm-event-modal-btn');
+              const onNext = () => {
+                confirmBtn?.removeEventListener('click', onNext);
+                this.tycoon.playerTileIndex = nextTarget.index;
                 this.saveTycoonState();
-                this.handleLandOnTile(targetIdx, false);
-              });
-            });
-          }
-        );
+                playGameSfx('step');
+                this.handleLandOnTile(nextTarget.index, false);
+              };
+              confirmBtn?.addEventListener('click', onNext);
+            }
+          );
+        }
         return;
       }
 
@@ -874,41 +1033,36 @@
           const isSelected = s.id === this.selectedScenario?.id;
           const lv = this.tycoon.buildingLevels[s.id] || 0;
           const bldName = s.buildingName || s.title;
+          const stageConfig = window.ExecVoice.BUILDING_STAGES_CONFIG[Math.min(lv, 3)];
           return `
           <article class="scenario-card ${isSelected ? 'selected' : ''}" data-id="${s.id}">
             <div class="scenario-card-top">
               <span class="badge-category">${this.escapeHtml(s.buildingIcon || '🏢')} ${this.escapeHtml(s.category)}</span>
-              <span class="badge-difficulty">🏗️ Lv.${lv} ｜ ${this.escapeHtml(s.difficulty)}</span>
+              <span class="badge-difficulty">🏗️ Lv.${lv} ｜ ${stageConfig.buildingTypeLabel}</span>
             </div>
             <h3 class="scenario-card-title">${this.escapeHtml(bldName)}</h3>
             <p class="scenario-card-role">
-              <strong>任務：</strong>${this.escapeHtml(s.title)}
+              <strong>情境任務：</strong>${this.escapeHtml(s.title)}
             </p>
             <p class="scenario-card-desc">${this.escapeHtml(s.background)}</p>
             <div class="scenario-card-footer">
-              <span class="objective-count">💰 過關獎金 $${(s.baseReward || 1200).toLocaleString()}</span>
-              <span class="select-indicator">${isSelected ? '✓ 當前鎖定建築' : '鎖定此建築 →'}</span>
+              <span class="objective-count">💰 通關獎金 $${(s.baseReward || 1200).toLocaleString()}</span>
+              <span class="select-indicator">${isSelected ? '✓ 正在檢視藍圖' : '檢視建築藍圖 →'}</span>
             </div>
           </article>
         `;
         })
         .join('');
 
+      // Clicking scenario card in atlas only selects for blueprint inspection
       container.querySelectorAll('.scenario-card').forEach((card) => {
         card.addEventListener('click', () => {
           const found = this.allScenarios.find((item) => item.id === card.dataset.id);
           if (found) {
             this.selectedScenario = found;
-            // Also move player pawn to matching tile if it's on the board
-            const matchingTile = BOARD_TILES.find((t) => t.scenarioId === found.id);
-            if (matchingTile) {
-              this.tycoon.playerTileIndex = matchingTile.index;
-              this.saveTycoonState();
-            }
             this.renderSimCityBoard();
             this.renderScenarioList();
             this.renderSelectedScenarioPreview();
-            this.populateStudioHeader();
           }
         });
       });
@@ -919,30 +1073,62 @@
       if (!s) return;
 
       const lv = this.tycoon.buildingLevels[s.id] || 0;
-      const bestScore = this.tycoon.buildingBestScores[s.id] || 0;
-      const levelNames = ['Lv.0 待開發店面', 'Lv.1 初階職場據點 ★☆☆', 'Lv.2 旗艦商業大樓 ★★☆', 'Lv.3 模擬城市摩天輪地標 ★★★'];
+      const stageConfig = window.ExecVoice.BUILDING_STAGES_CONFIG[Math.min(lv, 3)];
+
+      const currentLandedTile = BOARD_TILES[this.tycoon.playerTileIndex];
+      const isPlayerAtThisBuilding =
+        (currentLandedTile?.scenarioId === s.id) ||
+        (currentLandedTile?.type === 'ai-lot' && s.id.startsWith('ai-'));
 
       const zoneBadge = document.getElementById('preview-zone-badge');
       const levelBadge = document.getElementById('preview-building-level');
       const iconEl = document.getElementById('preview-building-icon');
       const bldNameEl = document.getElementById('preview-building-name');
       const rewardBadge = document.getElementById('preview-reward-badge');
+      const stageBanner = document.getElementById('preview-stage-banner');
+      const stageLadder = document.getElementById('preview-stage-ladder');
 
       if (zoneBadge) zoneBadge.textContent = s.zoneLabel || `🟦 ${s.category}`;
       if (levelBadge) {
-        levelBadge.textContent =
-          bestScore > 0 ? `${levelNames[lv]} (最高 ${bestScore} 分)` : levelNames[lv];
+        levelBadge.textContent = `Lv.${lv} ${'★'.repeat(lv)}${'☆'.repeat(Math.max(0, 3 - lv))} (${stageConfig.buildingTypeLabel})`;
       }
       if (iconEl) iconEl.textContent = lv >= 3 ? '🏙️' : s.buildingIcon || '🏢';
       if (bldNameEl) bldNameEl.textContent = s.buildingName || s.title;
-      if (rewardBadge) rewardBadge.textContent = `💰 過關獎金 +$${(s.baseReward || 1200).toLocaleString()}`;
+      if (rewardBadge) {
+        const stageReward = Math.round((s.baseReward || 1200) * stageConfig.clearRewardMultiplier);
+        rewardBadge.textContent = `💰 本階過關獎金 +$${stageReward.toLocaleString()}`;
+      }
 
-      document.getElementById('preview-title').textContent = s.title;
+      if (stageBanner) {
+        stageBanner.textContent = `${stageConfig.stageBadge} ｜ ${stageConfig.stageTaskHint}`;
+      }
+
+      if (stageLadder) {
+        stageLadder.innerHTML = window.ExecVoice.BUILDING_STAGES_CONFIG.slice(0, 3).map((stg, i) => {
+          const isDone = lv > i;
+          const isTarget = lv === i;
+          const statusText = isDone ? '✅ 已完成' : isTarget ? '🎯 當前挑戰目標' : '🔒 待解鎖';
+          const rewardVal = Math.round((s.baseReward || 1200) * stg.clearRewardMultiplier);
+          const rentInfo = stg.arrivalRent > 0 ? ` ＋ 抵達分紅 $${stg.arrivalRent}` : '';
+          return `
+            <div class="stage-ladder-item ${isTarget ? 'current-target' : ''} ${isDone ? 'completed' : ''}">
+              <span><strong>Lv.${i + 1} ${stg.buildingTypeLabel}</strong>（目標 ${stg.minScore} 分）</span>
+              <span>💰 +$${rewardVal.toLocaleString()}${rentInfo} ｜ ${statusText}</span>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const stageVariation = s.stageVariations?.[lv + 1];
+      const displayTitle = stageVariation?.stageTitle || s.title;
+      const displayBg = stageVariation?.extraContext ? `${s.background}\n\n${stageVariation.extraContext}` : s.background;
+
+      document.getElementById('preview-title').textContent = displayTitle;
       document.getElementById('preview-category').textContent = `${s.category} · ${s.difficulty}`;
       document.getElementById('preview-ai-persona').textContent = `${s.aiName} (${s.aiRole})`;
       document.getElementById('preview-ai-attitude').textContent = s.aiPersonality;
       document.getElementById('preview-user-role').textContent = s.userRole;
-      document.getElementById('preview-background').textContent = s.background;
+      document.getElementById('preview-background').textContent = displayBg;
       document.getElementById('preview-opening-en').textContent = `"${s.openingLine}"`;
       document.getElementById('preview-opening-zh').textContent = s.openingLineZh || '';
 
@@ -980,6 +1166,18 @@
           }
         });
       });
+
+      // Update enter button: strict check so students cannot jump to non-landed buildings!
+      const enterBtn = document.getElementById('start-roleplay-from-hub-btn');
+      if (enterBtn) {
+        if (isPlayerAtThisBuilding) {
+          enterBtn.disabled = false;
+          enterBtn.textContent = `🏢 進入此建築挑戰【${stageConfig.stageBadge.split('：')[1] || '建案任務'}】！`;
+        } else {
+          enterBtn.disabled = true;
+          enterBtn.textContent = `🎲 請擲 3D 骰子前進至此建築以解鎖任務 (你目前在 #${this.tycoon.playerTileIndex + 1} 格)`;
+        }
+      }
     }
 
     async handleAIGenerateScenario() {
@@ -1889,33 +2087,40 @@
       if (userTurnCount === 0 || score === 0) {
         statusTitle = `⚠️ 「${s.buildingName || s.title}」建案尚未開工`;
         statusDesc = '本次尚未錄到你的英文回答，回到對練室開口說至少一句英文即可領取打工獎金並蓋出建築！';
-      } else if (score >= 88) {
+      } else if (prevLevel >= 3 && score >= 85) {
         earnedLevel = 3;
-        earnedMoney = Math.round(baseReward * 1.5);
-        earnedRep = 35;
-        statusTitle = `🏙️ 完美驗收！「${s.buildingName || s.title}」升級為 Lv.3 摩天輪地標大樓 (★★★)！`;
-        statusDesc = '你的英語口語自然又有禮貌，市長親自頒發特優建築執照與 1.5 倍高額獎金！';
+        earnedMoney = Math.round(baseReward * 2.5);
+        earnedRep = 40;
+        statusTitle = `👑 頂級地標卓越營運！「${s.buildingName || s.title}」滿級蟬聯特優！`;
+        statusDesc = '你的口語表達無懈可擊，市長特別撥發最高營運紅利金 +$' + earnedMoney.toLocaleString() + '！';
+        playGameSfx('upgrade');
+      } else if (score >= 85) {
+        earnedLevel = 3;
+        earnedMoney = Math.round(baseReward * 2.2);
+        earnedRep = 50;
+        statusTitle = `🏙️ 摩天大樓地標封頂！「${s.buildingName || s.title}」升級為 Lv.3 璀璨摩天大樓 (★★★)！`;
+        statusDesc = '你的英語口語自然又有禮貌，市長親自頒發特優地標執照與 2.2 倍高額營建獎金！';
         playGameSfx('upgrade');
       } else if (score >= 75) {
         earnedLevel = 2;
-        earnedMoney = Math.round(baseReward * 1.2);
-        earnedRep = 25;
-        statusTitle = `🏢 建案大成功！「${s.buildingName || s.title}」升級為 Lv.2 旗艦商業大樓 (★★☆)！`;
-        statusDesc = '你順利達成了關鍵任務目標，門市業績大幅成長！再挑戰 88 分以上即可升至最高摩天大樓！';
+        earnedMoney = Math.round(baseReward * 1.5);
+        earnedRep = 30;
+        statusTitle = `🏢 旗艦商廈擴建成功！「${s.buildingName || s.title}」升級為 Lv.2 玻璃商業大樓 (★★☆)！`;
+        statusDesc = '你順利達成了多項關鍵任務，門市業績大幅成長！再挑戰 85 分以上即可升級為 Lv.3 摩天大樓地標！';
         playGameSfx('upgrade');
       } else if (score >= 60) {
         earnedLevel = 1;
         earnedMoney = baseReward;
         earnedRep = 15;
-        statusTitle = `🏠 建案驗收通過！「${s.buildingName || s.title}」成功建造 Lv.1 初階職場據點 (★☆☆)！`;
-        statusDesc = '恭喜完成基本職場溝通！參考下方逐句修正建議再練習一次，就能把建築升級為二級旗艦大樓！';
+        statusTitle = `🏠 街邊門市開張！「${s.buildingName || s.title}」成功建造 Lv.1 初階職場據點 (★☆☆)！`;
+        statusDesc = '恭喜完成基本職場溝通！參考下方逐句修正建議再練習一次，就能把建築升級為 Lv.2 旗艦商業大樓！';
         playGameSfx('payday');
       } else {
         earnedLevel = prevLevel;
         earnedMoney = 400;
         earnedRep = 5;
         statusTitle = `🔨 「${s.buildingName || s.title}」施工中 (獲得實習車馬費 +$400)`;
-        statusDesc = '距離 60 分過關門檻只差一點點！把下方 3 個任務關鍵句唸熟後再挑戰一次即可成功蓋樓！';
+        statusDesc = '距離 60 分過關門檻只差一點點！把下方任務關鍵句唸熟後再挑戰一次即可成功蓋樓！';
       }
 
       const newLevel = Math.max(prevLevel, earnedLevel);

@@ -264,6 +264,7 @@
 
       this.playerId = this.safeGetStorage('workplace_english_player_id') || ('u-' + Math.random().toString(36).slice(2, 8));
       this.safeSetStorage('workplace_english_player_id', this.playerId);
+      this.sessionId = 'sess-' + Math.random().toString(36).slice(2, 9);
       this.playerName = this.safeGetStorage('workplace_english_player_name') || '高中實習生';
 
       this.initDOM();
@@ -410,6 +411,9 @@
       // Mobile Presence Sheet handlers
       const feedEl = document.getElementById('live-feed');
       document.getElementById('toggle-feed-mobile-btn')?.addEventListener('click', () => {
+        feedEl?.classList.toggle('open-sheet');
+      });
+      document.getElementById('hud-users-pill')?.addEventListener('click', () => {
         feedEl?.classList.toggle('open-sheet');
       });
       document.getElementById('close-feed-sheet-btn')?.addEventListener('click', () => {
@@ -727,20 +731,73 @@
         }
       });
 
+      const hudLiveCountEl = document.getElementById('hud-live-count');
+      const hudAvatarsEl = document.getElementById('hud-users-avatars');
+
       this.presence.onUsers((users) => {
+        const countText = `${users.length} 位實習生在線`;
         if (countEl) countEl.textContent = `${users.length} 人在線`;
         if (mobileCountEl) mobileCountEl.textContent = `${users.length} 人在線`;
+        if (hudLiveCountEl) hudLiveCountEl.textContent = countText;
+
+        // Populate side feed users
         if (usersEl) {
           usersEl.innerHTML = users
             .map(
               (u) => `
-            <li class="feed-user-chip" title="#${u.tile + 1} 格 · ${u.buildings || 0} 棟建築">
+            <li class="feed-user-chip" data-user-id="${u.id}" title="#${(u.tile || 0) + 1} 格 · ${u.buildings || 0} 棟建築（點擊鏡頭飛躍）" style="cursor: pointer;">
               <span class="u-dot" style="background:${u.color || '#38bdf8'}"></span>
               <span>${this.escapeHtml(u.name)}${u.me ? ' (你)' : ''}</span>
             </li>`
             )
             .join('');
+
+          usersEl.querySelectorAll('.feed-user-chip').forEach((el) => {
+            el.addEventListener('click', () => {
+              const uid = el.getAttribute('data-user-id');
+              const target = users.find((x) => x.id === uid);
+              if (!target) return;
+              if (target.me) {
+                this.islandCity?.focusPlayer();
+                this.showToast('📍 鏡頭已聚焦至你的位置！');
+              } else {
+                this.islandCity?.focusRemotePlayer(uid);
+                this.showToast(`📍 鏡頭已鎖定在線同學「${target.name}」在 #${(target.tile || 0) + 1} 格！`);
+              }
+            });
+          });
         }
+
+        // Populate Top Live Classmates HUD Bar
+        if (hudAvatarsEl) {
+          hudAvatarsEl.innerHTML = users
+            .map(
+              (u) => `
+            <button class="hud-avatar-chip ${u.me ? 'is-me' : ''}" type="button" data-user-id="${u.id}" title="${this.escapeHtml(u.name)}${u.me ? ' (你)' : ''} · 在第 #${(u.tile || 0) + 1} 格 (點擊鏡頭鎖定)">
+              <span class="hud-chip-dot" style="background:${u.color || '#38bdf8'}"></span>
+              <span class="hud-chip-name">${this.escapeHtml(u.name)}${u.me ? ' (你)' : ''}</span>
+              <span class="hud-chip-tile">#${(u.tile || 0) + 1}</span>
+            </button>`
+            )
+            .join('');
+
+          hudAvatarsEl.querySelectorAll('.hud-avatar-chip').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const uid = btn.getAttribute('data-user-id');
+              const target = users.find((x) => x.id === uid);
+              if (!target) return;
+              if (target.me) {
+                this.islandCity?.focusPlayer();
+                this.showToast('📍 鏡頭已聚焦至你的位置！');
+              } else {
+                this.islandCity?.focusRemotePlayer(uid);
+                this.showToast(`📍 鏡頭已鎖定在線同學「${target.name}」在 #${(target.tile || 0) + 1} 格！`);
+              }
+            });
+          });
+        }
+
         const others = users.filter((u) => !u.me);
         this.islandCity?.setRemotePlayers(others);
       });
@@ -757,7 +814,8 @@
       });
 
       this.presence.start({
-        id: this.playerId,
+        id: this.sessionId,
+        playerId: this.playerId,
         name: this.playerName,
         color: '#f97316',
         tile: this.tycoon.playerTileIndex,

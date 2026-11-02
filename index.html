@@ -118,6 +118,15 @@
       <section class="island-stage" aria-label="3D 動態島城市">
         <div id="island-canvas-wrap" class="island-canvas-wrap"></div>
 
+        <!-- LIVE CLASSMATES HUD -->
+        <div class="island-live-users-hud" id="island-live-users-hud">
+          <button class="hud-users-pill" id="hud-users-pill" type="button" title="點擊查看城市在線動態">
+            <span class="live-dot-pulse"></span>
+            <span id="hud-live-count" class="hud-live-count">連線在線同學中...</span>
+          </button>
+          <div class="hud-users-avatars" id="hud-users-avatars" aria-label="在線同學名冊快捷列"></div>
+        </div>
+
         <div class="island-hud island-hud-top">
           <div class="island-legend">
             <span class="zone-legend legend-c">🟦 商業打工區</span>
@@ -593,6 +602,7 @@
   <script src="./gemini-service.js"></script>
   <script src="./vendor/three.min.js"></script>
   <script src="./island3d.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
   <script src="./presence.js"></script>
   <script src="./app.js"></script>
 </body>

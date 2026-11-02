@@ -31,7 +31,7 @@
     _event(ev) { this.h.event.forEach((cb) => cb(ev)); }
   }
 
-  /* ---------------------------------------------------------- simulated */
+  /* ---------------------------------------------------------- simulated + multi-device hybrid */
   class SimulatedPresence extends Emitter {
     constructor(opts) {
       super();
@@ -42,6 +42,9 @@
       this.self = null;
       this.timer = null;
       this.bc = null;
+      this.mqttClient = null;
+      this.mqttTopic = 'simcareer/island/presence/v1';
+      this.mqttConnected = false;
     }
 
     start(self) {
@@ -58,6 +61,7 @@
         isBot: true
       }));
 
+      // 1. Cross-tab sync via BroadcastChannel
       try {
         this.bc = new BroadcastChannel('simcareer-island-presence');
         this.bc.onmessage = (e) => {
@@ -76,10 +80,71 @@
         this.bc = null;
       }
 
+      // 2. Real cross-device internet sync via public MQTT broker
+      this._initMqtt();
+
       this.timer = setInterval(() => this._tick(), 1000);
       this._broadcastSelf();
       this._emitUsers();
       this._event({ id: 'welcome', text: '🌴 歡迎來到 SimCareer 島城！同學們正在城市裡打工升級。', ts: Date.now() });
+    }
+
+    _initMqtt() {
+      if (!window.Paho || !window.Paho.MQTT) return;
+      try {
+        const cid = 'sc_' + (this.self.id || Math.random().toString(36).slice(2, 9));
+        const client = new window.Paho.MQTT.Client('broker.hivemq.com', 8884, '/mqtt', cid);
+        this.mqttClient = client;
+
+        client.onConnectionLost = () => {
+          this.mqttConnected = false;
+          setTimeout(() => {
+            if (this.self) this._initMqtt();
+          }, 6000);
+        };
+
+        client.onMessageArrived = (msg) => {
+          try {
+            const data = JSON.parse(msg.payloadString);
+            if (!data || data.id === this.self.id) return;
+            if (data.kind === 'state') {
+              this.remote.set(data.id, Object.assign({}, data.user, { seen: Date.now(), isRealUser: true }));
+              this._emitUsers();
+            } else if (data.kind === 'event') {
+              this._event({ id: 'e' + Date.now() + Math.random(), text: data.text, ts: data.ts });
+            } else if (data.kind === 'bye') {
+              this.remote.delete(data.id);
+              this._emitUsers();
+            }
+          } catch (_) {}
+        };
+
+        client.connect({
+          useSSL: true,
+          timeout: 6,
+          keepAliveInterval: 30,
+          cleanSession: true,
+          onSuccess: () => {
+            this.mqttConnected = true;
+            client.subscribe(this.mqttTopic);
+            this._broadcastMqtt('state', { user: this.self });
+          },
+          onFailure: () => {
+            this.mqttConnected = false;
+          }
+        });
+      } catch (_) {}
+    }
+
+    _broadcastMqtt(kind, extra = {}) {
+      if (!this.mqttClient || !this.mqttConnected) return;
+      try {
+        const payload = JSON.stringify(Object.assign({ kind, id: this.self.id, ts: Date.now() }, extra));
+        const message = new window.Paho.MQTT.Message(payload);
+        message.destinationName = this.mqttTopic;
+        message.qos = 0;
+        this.mqttClient.send(message);
+      } catch (_) {}
     }
 
     _tick() {
@@ -99,7 +164,7 @@
       });
       const now = Date.now();
       this.remote.forEach((u, id) => {
-        if (now - u.seen > 9000) this.remote.delete(id);
+        if (now - u.seen > 12000) this.remote.delete(id);
       });
       this._broadcastSelf();
       this._emitUsers();
@@ -140,19 +205,22 @@
     _emitUsers() {
       const list = [];
       if (this.self) list.push(Object.assign({ me: true }, this.self));
+      this.remote.forEach((u) => list.push(Object.assign({ live: true }, u)));
       this.bots.forEach((b) =>
         list.push({
           id: b.id, name: b.name, color: b.color, tile: b.tile,
           buildings: Object.keys(b.levels).length, isBot: true
         })
       );
-      this.remote.forEach((u) => list.push(Object.assign({ live: true }, u)));
       this._users(list);
     }
 
     _broadcastSelf() {
       if (this.bc && this.self) {
         this.bc.postMessage({ kind: 'state', id: this.self.id, user: this.self });
+      }
+      if (this.mqttConnected && this.self) {
+        this._broadcastMqtt('state', { user: this.self });
       }
     }
 
@@ -166,6 +234,7 @@
       const ev = { id: 'e' + Date.now(), text, ts: Date.now() };
       this._event(ev);
       if (this.bc) this.bc.postMessage({ kind: 'event', id: this.self.id, text, ts: ev.ts });
+      if (this.mqttConnected) this._broadcastMqtt('event', { text, ts: ev.ts });
     }
 
     stop() {
@@ -173,6 +242,10 @@
       if (this.bc) {
         this.bc.postMessage({ kind: 'bye', id: this.self.id });
         this.bc.close();
+      }
+      if (this.mqttConnected) {
+        this._broadcastMqtt('bye', {});
+        try { this.mqttClient.disconnect(); } catch (_) {}
       }
     }
   }

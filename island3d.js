@@ -474,11 +474,21 @@
 
   function animateAvatar(av, time, moving, phase) {
     const u = av.userData;
-    const sw = moving ? Math.sin(time * 11 + (phase || 0)) * 0.7 : 0;
-    u.legL.rotation.x = sw;
-    u.legR.rotation.x = -sw;
-    u.armL.rotation.x = -sw * 0.8;
-    u.armR.rotation.x = sw * 0.8;
+    if (!u || !u.legL) return;
+    const ph = phase || 0;
+    if (moving) {
+      const sw = Math.sin(time * 11 + ph) * 0.7;
+      u.legL.rotation.x = sw;
+      u.legR.rotation.x = -sw;
+      u.armL.rotation.x = -sw * 0.8;
+      u.armR.rotation.x = sw * 0.8;
+    } else {
+      // Idle natural breathing and limb relaxation
+      u.legL.rotation.x = 0;
+      u.legR.rotation.x = 0;
+      u.armL.rotation.x = Math.sin(time * 2.2 + ph) * 0.08;
+      u.armR.rotation.x = -Math.sin(time * 2.2 + ph) * 0.08;
+    }
   }
 
   /** Moves an object along queued waypoints (hops optional). */
@@ -1391,12 +1401,23 @@
     /* --------------------------------------------------------------- public */
     _slot(index, slot) {
       const p = this.tilePos(index);
-      const offs = [[0, 2.45], [-2.3, 1.2], [2.3, 1.2], [-2.3, -0.6], [2.3, -0.6], [0, -2.4]];
+      // Position avatars along the open sidewalk plaza and street front in full camera view
+      const offs = [
+        [ 0.0, 2.7 ],   // Slot 0: Main player (front center entrance)
+        [-1.7, 2.6 ],   // Slot 1: Classmate left entrance
+        [ 1.7, 2.6 ],   // Slot 2: Classmate right entrance
+        [-2.8, 2.4 ],   // Slot 3: Sidewalk left curb
+        [ 2.8, 2.4 ],   // Slot 4: Sidewalk right curb
+        [ 0.0, 3.5 ],   // Slot 5: Avenue pedestrian crosswalk
+        [-1.8, 3.4 ],   // Slot 6: Avenue bike lane left
+        [ 1.8, 3.4 ]    // Slot 7: Avenue bike lane right
+      ];
       const o = offs[slot % offs.length];
       return { x: p.x + o[0], z: p.z + o[1] };
     }
 
     setTileInfos(infos) {
+      if (!this.ok || !this.tileRoots) return;
       infos.forEach((info) => {
         if (!info) return;
         const root = this.tileRoots[info.index];
@@ -1422,6 +1443,7 @@
     }
 
     setPlayerTile(index, animate) {
+      if (!this.ok) return;
       this.playerTile = index;
       const s = this._slot(index, 0);
       if (!this.meMover) return;
@@ -1431,7 +1453,7 @@
     }
 
     _updateHere() {
-      if (!this.hereRing) return;
+      if (!this.ok || !this.hereRing) return;
       const p = this.tilePos(this.playerTile);
       const root = this.tileRoots[this.playerTile];
       this.hereRing.position.set(p.x, 0.62, p.z);
@@ -1442,15 +1464,31 @@
     }
 
     setRemotePlayers(list) {
+      if (!this.ok || !this.island) return;
       const seen = new Set();
-      list.forEach((u) => {
+      (list || []).forEach((u, i) => {
         seen.add(u.id);
         let rp = this.remote.get(u.id);
-        const slot = 1 + (hashStr(u.id) % 5);
+        const slot = 1 + ((hashStr(u.id) + i) % 7);
         if (!rp) {
-          const av = makeAvatar(u.color || '#6366f1', hashStr(u.id), 1.0);
-          const label = makeLabel([u.name || '同學'], { bg: 'rgba(30,41,59,0.9)', border: u.color || '#a5b4fc', width: 3.2 });
-          label.position.y = 2.7;
+          // Scale avatar up to 1.25 for prominent visibility on the street
+          const av = makeAvatar(u.color || '#6366f1', hashStr(u.id), 1.25);
+
+          // Glowing circular shadow / pedestal under feet
+          const disc = new T.Mesh(
+            new T.RingGeometry(0.2, 0.72, 24),
+            new T.MeshBasicMaterial({ color: u.color || '#38bdf8', transparent: true, opacity: 0.75, side: T.DoubleSide })
+          );
+          disc.rotation.x = -Math.PI / 2;
+          disc.position.y = 0.04;
+          av.add(disc);
+
+          const label = makeLabel([u.name || '同學'], {
+            bg: 'rgba(15,23,42,0.92)',
+            border: u.color || '#38bdf8',
+            width: 3.6
+          });
+          label.position.y = 3.2;
           av.add(label);
           this.island.add(av);
           const s = this._slot(u.tile, slot);
@@ -1460,7 +1498,11 @@
         }
         if (rp.name !== u.name) {
           rp.name = u.name;
-          setLabel(rp.label, [u.name || '同學'], { bg: 'rgba(30,41,59,0.9)', border: u.color || '#a5b4fc', width: 3.2 });
+          setLabel(rp.label, [u.name || '同學'], {
+            bg: 'rgba(15,23,42,0.92)',
+            border: u.color || '#38bdf8',
+            width: 3.6
+          });
         }
         if (rp.tile !== u.tile) {
           const n = this.tiles.length;
@@ -1470,10 +1512,10 @@
             rp.mover.snap(s.x, s.z);
           } else {
             let t = rp.tile;
-            for (let i = 0; i < steps; i++) {
+            for (let j = 0; j < steps; j++) {
               t = (t + 1) % n;
               const s = this._slot(t, slot);
-              rp.mover.push(s.x, s.z, 0.42, 0.25);
+              rp.mover.push(s.x, s.z, 0.38, 0.28);
             }
           }
           rp.tile = u.tile;
@@ -1488,13 +1530,24 @@
       });
     }
 
+    focusRemotePlayer(id) {
+      if (!this.ok || !this.cam) return null;
+      const rp = this.remote.get(id);
+      if (!rp) return null;
+      this.cam.tTarget.set(rp.av.position.x, 1.8, rp.av.position.z);
+      this.cam.tDist = 32;
+      return rp;
+    }
+
     focusPlayer() {
+      if (!this.ok) return;
       const p = this.tilePos(this.playerTile);
       this.cam.tTarget.set(p.x, 1.5, p.z);
       this.cam.tDist = 34;
     }
 
     resetView() {
+      if (!this.ok) return;
       const isNarrow = (this.container.clientWidth / Math.max(1, this.container.clientHeight)) < 0.85;
       this.cam.tTarget.set(0, 1, 2);
       this.cam.tDist = isNarrow ? 76 : 62;
@@ -1503,6 +1556,7 @@
     }
 
     setPaused(p) {
+      if (!this.ok) return;
       this.paused = p;
     }
 

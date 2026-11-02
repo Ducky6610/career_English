@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimCareer 大富翁｜模擬城市高中職場英語真人語音對練系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- SIMCITY MAYOR & RICHMAN TYCOON TOP HUD -->
+    <header class="top-navbar simcity-navbar">
+      <div class="brand-group">
+        <div class="brand-logo" title="模擬城市 × 大富翁職場英語">🏙️</div>
+        <div>
+          <h1 class="brand-title">
+            SimCareer 職場大富翁
+            <span class="brand-tag">模擬城市 × 高中英語 A2~B1</span>
+          </h1>
+          <p class="brand-subtitle">擲骰子探索模擬城市商業區、開口說英文完成打工實習任務、升級你的摩天大樓地標！</p>
+        </div>
+      </div>
+
+      <!-- SimCity RCI & Player Tycoon Resource Bar -->
+      <div class="simcity-stats-hud" aria-label="大富翁與模擬城市狀態列">
+        <div class="sc-stat-chip sc-money" title="完成英語口語任務或經過起點即可獲得職涯資金">
+          <span class="sc-stat-icon">💰</span>
+          <div>
+            <span class="sc-stat-label">職涯資金 (Funds)</span>
+            <strong id="tycoon-money" class="sc-stat-value">$3,000</strong>
+          </div>
+        </div>
+
+        <div class="sc-stat-chip sc-rep" title="口語評估分數越高，城市聲望與職涯等級越高">
+          <span class="sc-stat-icon">⭐</span>
+          <div>
+            <span class="sc-stat-label">城市聲望 (Reputation)</span>
+            <strong id="tycoon-rep" class="sc-stat-value">100 pt · 實習新星</strong>
+          </div>
+        </div>
+
+        <div class="sc-stat-chip sc-buildings" title="在各職場建築拿到 60 分以上即可蓋出大樓並升級">
+          <span class="sc-stat-icon">🏢</span>
+          <div>
+            <span class="sc-stat-label">已開發地標 (Landmarks)</span>
+            <strong id="tycoon-buildings" class="sc-stat-value">0 / 8 棟</strong>
+          </div>
+        </div>
+
+        <div class="sc-stat-chip sc-day">
+          <span class="sc-stat-icon">📅</span>
+          <div>
+            <span class="sc-stat-label">職涯回合</span>
+            <strong id="tycoon-day" class="sc-stat-value">Day 1</strong>
+          </div>
+        </div>
+
+        <!-- Classic SimCity R-C-I Demand Bars -->
+        <div class="rci-meter-box" title="模擬城市 RCI 分區發展指標（商業 / 實習商辦 / 公共志工）">
+          <div class="rci-col">
+            <div class="rci-bar-track"><div id="rci-bar-c" class="rci-bar-fill fill-c" style="height: 65%"></div></div>
+            <span>C商</span>
+          </div>
+          <div class="rci-col">
+            <div class="rci-bar-track"><div id="rci-bar-i" class="rci-bar-fill fill-i" style="height: 55%"></div></div>
+            <span>I辦</span>
+          </div>
+          <div class="rci-col">
+            <div class="rci-bar-track"><div id="rci-bar-g" class="rci-bar-fill fill-g" style="height: 75%"></div></div>
+            <span>G公</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-Bottom-Row">
+        <nav class="main-nav-tabs" aria-label="主要功能切換">
+          <button class="nav-tab active" data-view="hub">
+            <span>🗺️ 1. 模擬城市大富翁地圖</span>
+          </button>
+          <button class="nav-tab" data-view="studio">
+            <span>🎙️ 2. 職場建築語音對練室</span>
+          </button>
+          <button class="nav-tab" data-view="evaluation">
+            <span>🏗️ 3. 市長評鑑與建案驗收報告</span>
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <button id="open-api-modal-btn" class="status-pill status-demo">
+            🔑 設定 API Key
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- SIMCITY CLASSIC LED NEWS TICKER -->
+    <div class="simcity-ticker-bar">
+      <span class="ticker-badge">📡 模擬城市市政快訊</span>
+      <div class="ticker-track">
+        <span id="simcity-news-ticker" class="ticker-text">
+          🌤️ 模擬城市今日天氣晴朗！商業區「星巴風陽光咖啡館」與「珍珠奶茶台灣旗艦店」急徵英語工讀生，擲骰子或直接點擊建築即可進入語音對練領取豐厚打工獎金！
+        </span>
+      </div>
+    </div>
+
+    <!-- VIEW 1: SIMCITY RICHMAN BOARD & SCENARIO DESIGNER -->
+    <main id="view-hub" class="view-section active">
+      <!-- Top Game Board + Right Building Blueprint Layout -->
+      <div class="simcity-board-layout">
+        <!-- Left: 5x5 SimCity Isometric Richman Loop Board -->
+        <section class="simcity-map-viewport" aria-label="模擬城市大富翁棋盤">
+          <div class="map-toolbar">
+            <div class="map-toolbar-left">
+              <span class="zone-legend legend-c">🟦 商業打工區 (Commercial)</span>
+              <span class="zone-legend legend-i">🟨 企業實習園區 (Office/Tech)</span>
+              <span class="zone-legend legend-g">🟩 公共文教志工區 (Civic)</span>
+              <span class="zone-legend legend-s">🟪 機會命運／特殊市政</span>
+            </div>
+            <div class="map-toolbar-right">
+              <span class="map-hint-pill">💡 玩法：可點中央「🎲 擲骰子前進」，或直接點地圖上任一棟建築開始！</span>
+            </div>
+          </div>
+
+          <!-- 5x5 Grid Perimeter Board + 3x3 Central SimCity Plaza -->
+          <div id="simcity-board-grid" class="simcity-board-grid">
+            <!-- JS populates the 16 perimeter tiles and the central 3x3 SimCity Command Plaza -->
+          </div>
+        </section>
+
+        <!-- Right: Selected Building Blueprint & Scenario Briefing Card -->
+        <aside class="hub-preview-panel">
+          <div class="preview-sticky-card simcity-blueprint-card">
+            <div class="blueprint-top-ribbon">
+              <span id="preview-zone-badge" class="badge-zone">🟦 商業區 · 餐飲門市</span>
+              <span id="preview-building-level" class="badge-level">🏗️ Lv.0 待開發店面</span>
+            </div>
+
+            <div class="preview-header">
+              <div class="preview-building-title-row">
+                <span id="preview-building-icon" class="preview-building-icon">☕</span>
+                <div>
+                  <h2 id="preview-building-name" class="preview-building-name">星巴風陽光咖啡館</h2>
+                  <p id="preview-title" class="preview-scenario-subtitle">情境標題</p>
+                </div>
+              </div>
+              <div class="preview-reward-strip">
+                <span id="preview-category" class="badge-category">餐飲打工 · 基礎 (CEFR A2)</span>
+                <span id="preview-reward-badge" class="badge-reward">💰 過關獎金 +$1,200</span>
+              </div>
+            </div>
+
+            <div class="persona-grid">
+              <div class="persona-box">
+                <span class="persona-label">🤖 建築內 NPC 對象</span>
+                <strong id="preview-ai-persona">Emma Watson</strong>
+                <p id="preview-ai-attitude" class="persona-attitude"></p>
+              </div>
+              <div class="persona-box">
+                <span class="persona-label">🧑‍🎓 你的職涯角色</span>
+                <strong id="preview-user-role">咖啡廳工讀生</strong>
+              </div>
+            </div>
+
+            <div class="preview-block">
+              <h4>📌 職場建築任務背景 (Mission Briefing)</h4>
+              <p id="preview-background"></p>
+            </div>
+
+            <div class="preview-block">
+              <h4>🎯 建案驗收過關條件 (開口達成以下 3 點即可升級大樓)</h4>
+              <ul id="preview-objectives-list" class="objectives-list"></ul>
+            </div>
+
+            <div class="preview-block opening-preview-box">
+              <h4>🗣️ NPC 開場白預覽</h4>
+              <p id="preview-opening-en" class="opening-en"></p>
+              <p id="preview-opening-zh" class="opening-zh"></p>
+            </div>
+
+            <div class="preview-block">
+              <h4>💡 建築通關推薦句型 (點 🔊 可先聽真人示範發音)</h4>
+              <div id="preview-phrases-list" class="phrases-preview-list"></div>
+            </div>
+
+            <div class="preview-cta-row">
+              <button id="start-roleplay-from-hub-btn" class="btn-primary-large full-width btn-simcity-enter">
+                🏢 進入此建築開始真人語音任務
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- SIMCITY URBAN PLANNING & AI ZONING GENERATOR -->
+      <section class="ai-generator-banner simcity-zoning-banner">
+        <div class="ai-gen-header">
+          <div>
+            <h2>🏗️ 模擬城市都市計畫局：AI 一鍵建造專屬職場英語大樓（CEFR A2~B1）</h2>
+            <p>想在地圖上蓋出新的打工或實習場景嗎？輸入一句話（例如：「在電影院打工幫外國觀眾買票與爆米花」），AI 立即為你建造新職場大樓與任務！</p>
+          </div>
+          <button id="open-custom-scenario-btn" class="btn-secondary">
+            🛠️ 手動自訂建築與關卡
+          </button>
+        </div>
+
+        <div class="ai-gen-input-row">
+          <input
+            id="ai-scenario-prompt-input"
+            type="text"
+            placeholder="輸入你想建造的職場情境，例如：在市立圖書館或電影院打工，幫外國遊客辦理借書證或買票..."
+          />
+          <button id="ai-generate-scenario-btn" class="btn-accent">
+            ⚡ AI 立即建造新職場大樓
+          </button>
+        </div>
+
+        <div class="quick-prompts-row">
+          <span class="quick-label">熱門都市建案：</span>
+          <button class="quick-prompt-chip" data-prompt="在威秀風電影院打工，幫外國觀眾購買電影票並推薦爆米花套餐">🍿 電影院打工售票處</button>
+          <button class="quick-prompt-chip" data-prompt="在青年旅舍櫃檯打工，幫外國背包客辦理入住 Check-in 並介紹附近夜市">🏨 國際青年旅舍櫃檯</button>
+          <button class="quick-prompt-chip" data-prompt="在暑期實習時身體不舒服，打電話向實習主管禮貌請病假一天">🏥 向實習主管禮貌請病假</button>
+        </div>
+      </section>
+
+      <!-- All City Buildings & Custom Scenarios Directory -->
+      <section class="city-directory-section">
+        <div class="directory-header-row">
+          <h3>🏘️ 模擬城市全區職場建築名錄（亦可從此處快速切換情境）</h3>
+          <div class="category-filter-bar">
+            <button class="category-pill active" data-category="全部">全部建築</button>
+            <button class="category-pill" data-category="餐飲打工">🟦 餐飲打工</button>
+            <button class="category-pill" data-category="打工溝通">🟦 打工溝通</button>
+            <button class="category-pill" data-category="實習面試">🟨 實習面試</button>
+            <button class="category-pill" data-category="辦公室實習">🟨 辦公室實習</button>
+            <button class="category-pill" data-category="接待志工">🟩 接待志工</button>
+            <button class="category-pill" data-category="AI 生成情境">🟪 AI 自建大樓</button>
+          </div>
+        </div>
+        <div id="scenario-cards-grid" class="scenario-cards-grid"></div>
+      </section>
+    </main>
+
+    <!-- VIEW 2: LIVE VOICE ROLEPLAY STUDIO (INSIDE THE BUILDING) -->
+    <main id="view-studio" class="view-section">
+      <div class="studio-layout">
+        <!-- Left / Center: Building Interior Stage + Voice Orb + Live Transcript Stream -->
+        <div class="studio-stage-column">
+          <div class="studio-stage-header">
+            <div>
+              <div class="studio-badges-row">
+                <span id="studio-building-badge" class="building-interior-badge">🏢 當前所在建築：星巴風陽光咖啡館</span>
+                <span id="studio-engine-badge" class="engine-badge">語音引擎：雲端擬真神經語音</span>
+              </div>
+              <h2 id="studio-scenario-title">情境標題</h2>
+              <p class="studio-roles-line">
+                建築內 NPC：<strong id="studio-ai-name"></strong> (<span id="studio-ai-role"></span>) ｜ 你的職位：<strong id="studio-user-role"></strong>
+              </p>
+            </div>
+            <div class="studio-header-right">
+              <button id="back-to-map-btn" class="btn-secondary btn-small">🗺️ 返回城市地圖</button>
+              <div class="call-timer-box">
+                <span class="timer-dot"></span>
+                <span id="call-timer">00:00</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive Voice Visualizer Stage -->
+          <div class="voice-visualizer-stage">
+            <div class="orb-container">
+              <div id="voice-orb" class="voice-orb">
+                <div class="orb-core"></div>
+                <div class="orb-ring ring-1"></div>
+                <div class="orb-ring ring-2"></div>
+              </div>
+            </div>
+
+            <div class="spectrum-bars" aria-hidden="true">
+              <span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span>
+              <span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span>
+              <span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span>
+              <span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span>
+              <span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span>
+              <span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span><span class="spectrum-bar"></span>
+            </div>
+
+            <p id="orb-status-label" class="orb-status-label">
+              點擊下方「🎙️ 開始真人語音對練」啟動雙向即時語音任務
+            </p>
+            <div id="live-interim-container" class="live-interim-container hidden">
+              <span id="live-interim-transcript" class="live-interim-text"></span>
+              <button id="commit-speech-btn" type="button" class="btn-commit-speech">
+                ✅ 講完了，立即送出
+              </button>
+            </div>
+
+            <!-- Main Call Action Buttons -->
+            <div class="studio-call-controls">
+              <button id="toggle-call-btn" class="btn-primary-large">
+                🎙️ 開始真人語音對練
+              </button>
+              <button id="toggle-mute-btn" class="btn-secondary" disabled>
+                🎙️ 麥克風開啟中
+              </button>
+              <button id="end-and-evaluate-btn" class="btn-accent" disabled>
+                🏗️ 結束並驗收建築升級與獎金
+              </button>
+            </div>
+          </div>
+
+          <!-- Real-Time Bidirectional Transcript Stream -->
+          <div class="transcript-panel">
+            <div class="transcript-panel-header">
+              <h4>💬 即時雙向語音逐字稿 (可隨時點擊「✏️ 修正文字」微調辨識結果)</h4>
+              <span class="transcript-tip">支援直接對麥克風開口說英文，或使用下方文字框發送</span>
+            </div>
+            <div id="transcript-stream" class="transcript-stream"></div>
+
+            <form id="studio-text-form" class="studio-text-bar">
+              <input
+                id="studio-text-input"
+                type="text"
+                placeholder="除了直接對麥克風說英文，你也可以在此輸入英文句子發送..."
+              />
+              <button type="submit" class="btn-secondary">發送回應</button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Right: Live Coaching HUD (WPM, Fillers, Mission Checklist, Rescue Hints) -->
+        <aside class="studio-coaching-hud">
+          <!-- Real-time Pacing & Filler Monitor -->
+          <div class="hud-card">
+            <h3>⚡ 建築任務即時口語儀表板</h3>
+            <div class="hud-metrics-row">
+              <div class="hud-metric-box">
+                <span class="hud-label">即時語速 (Speaking Rate)</span>
+                <strong id="hud-wpm-value" class="hud-big-num">-- WPM</strong>
+                <span id="hud-wpm-advice" class="hud-sub">開口說話後自動計算語速</span>
+              </div>
+              <div class="hud-metric-box">
+                <span class="hud-label">口語贅字偵測 (Filler Words)</span>
+                <strong id="hud-filler-count" class="hud-big-num">0 次</strong>
+                <div id="hud-filler-tags" class="hud-filler-tags">
+                  <span class="filler-clean-badge">尚未偵測到口語贅字</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mission Checklist -->
+          <div class="hud-card">
+            <h3>🎯 建築升級過關條件 (達成越多獎金越高)</h3>
+            <div id="studio-mission-list" class="studio-mission-list"></div>
+          </div>
+
+          <!-- Real-time Rescue Hint Drawer -->
+          <div class="hud-card rescue-hud-card">
+            <div class="rescue-header">
+              <div>
+                <h3>💡 市民英語錦囊 (AI Rescue Coach)</h3>
+                <p id="rescue-strategy-tip" class="rescue-strategy-tip"></p>
+              </div>
+              <button id="get-rescue-hint-btn" class="btn-accent-small">
+                ✨ 刷新提示句
+              </button>
+            </div>
+            <div id="rescue-options-list" class="rescue-options-list"></div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- VIEW 3: SPEAKING EVALUATION & SIMCITY BUILDING UPGRADE REPORT -->
+    <main id="view-evaluation" class="view-section">
+      <div class="eval-header-bar">
+        <div>
+          <h2>🏗️ 模擬城市建案驗收 ＆ 口語表達五維度評鑑報告</h2>
+          <p>根據你剛才實際說出的英文進行毫秒級批改，結算大富翁打工獎金、城市聲望與建築升級等級！</p>
+        </div>
+        <div class="eval-header-actions">
+          <button id="eval-back-to-board-btn" class="btn-primary-large">
+            🎲 返回大富翁地圖繼續擲骰子
+          </button>
+          <button id="run-sample-eval-btn" class="btn-secondary">
+            ⚡ 載入範例對話並預覽建案驗收報告
+          </button>
+        </div>
+      </div>
+
+      <div id="evaluation-report-content" class="evaluation-report-content">
+        <div class="eval-empty-state">
+          <div class="empty-icon">🏙️</div>
+          <h3>尚未產生建案驗收與口語評估報告</h3>
+          <p>請先在「1. 模擬城市大富翁地圖」擲骰子或點擊任一建築進入語音對練，或點擊右上角「⚡ 載入範例對話並預覽建案驗收報告」！</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL 1: GEMINI API KEY & LIVE MODEL CONFIG -->
+  <div id="api-key-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🔑 設定 Gemini API Key 與即時語音模型</h3>
+        <button id="close-api-modal-btn" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          不填寫金鑰即可直接遊玩「模擬城市職場大富翁」完整語音辨識與即時評鑑！若輸入您的 Google Gemini API Key，則可額外啟用 <strong>Gemini 3.8 Live (`gemini-3.8-live`)</strong> 原生雙向語音串流。金鑰僅儲存在您的瀏覽器本機 (`localStorage`)。
+        </p>
+        <label class="form-field">
+          <span>Gemini API Key</span>
+          <input id="gemini-api-key-input" type="password" placeholder="AIzaSy..." autocomplete="off" />
+        </label>
+        <label class="form-field">
+          <span>即時語音對練模型 (Gemini Live Model)</span>
+          <select id="live-model-select">
+            <option value="gemini-3.8-live">gemini-3.8-live（推薦：超低延遲真人雙向語音互動）</option>
+            <option value="gemini-3.8-live-extended-thinking">gemini-3.8-live-extended-thinking（深層推理模式）</option>
+          </select>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button id="save-api-key-btn" class="btn-primary-large full-width">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: CUSTOM SCENARIO DESIGNER -->
+  <div id="custom-scenario-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card modal-large">
+      <div class="modal-header">
+        <h3>🏗️ 模擬城市自訂職場建築設計器 (Custom Building Designer)</h3>
+        <button id="close-custom-modal-btn" class="btn-close">✕</button>
+      </div>
+      <form id="custom-scenario-form" class="modal-body form-grid">
+        <label class="form-field span-2">
+          <span>職場建築／任務標題 *</span>
+          <input id="custom-title" type="text" required placeholder="例如：市立電影院打工：幫外國觀眾買票與介紹餐點" />
+        </label>
+
+        <label class="form-field">
+          <span>模擬城市分區 (Zoning)</span>
+          <select id="custom-category">
+            <option value="餐飲打工">🟦 商業區：餐飲打工</option>
+            <option value="打工溝通">🟦 商業區：打工溝通</option>
+            <option value="實習面試">🟨 商辦園區：實習面試</option>
+            <option value="辦公室實習">🟨 商辦園區：辦公室實習</option>
+            <option value="接待志工">🟩 公共文教區：接待志工</option>
+            <option value="AI 生成情境">🟪 特殊自訂建築</option>
+          </select>
+        </label>
+
+        <label class="form-field">
+          <span>難度等級</span>
+          <select id="custom-difficulty">
+            <option value="基礎 (CEFR A2)">基礎 (CEFR A2)</option>
+            <option value="初階 (CEFR A2+)" selected>初階 (CEFR A2+)</option>
+            <option value="中級 (CEFR B1)">中級 (CEFR B1)</option>
+          </select>
+        </label>
+
+        <label class="form-field">
+          <span>NPC 角色英文姓名 *</span>
+          <input id="custom-ai-name" type="text" required placeholder="例如：Emma Wilson" />
+        </label>
+
+        <label class="form-field">
+          <span>NPC 角色身分 *</span>
+          <input id="custom-ai-role" type="text" required placeholder="例如：外籍店長 (Store Manager) 或 外國顧客 (Customer)" />
+        </label>
+
+        <label class="form-field">
+          <span>AI 真人語音聲線</span>
+          <select id="custom-ai-voice">
+            <option value="Aoede">Aoede (自然親切女聲)</option>
+            <option value="Puck">Puck (陽光活力男聲)</option>
+            <option value="Kore">Kore (溫和清晰女聲)</option>
+            <option value="Fenrir">Fenrir (沉穩專業男聲)</option>
+            <option value="Charon">Charon (資深主管男聲)</option>
+          </select>
+        </label>
+
+        <label class="form-field">
+          <span>玩家扮演的角色 *</span>
+          <input id="custom-user-role" type="text" required placeholder="例如：電影院兼職工讀生 (Cinema Staff)" />
+        </label>
+
+        <label class="form-field span-2">
+          <span>NPC 角色個性與說話風格 *</span>
+          <input id="custom-ai-personality" type="text" required placeholder="例如：友善熱情，想買兩張晚場電影票並詢問爆米花口味" />
+        </label>
+
+        <label class="form-field span-2">
+          <span>職場建築任務背景描述 *</span>
+          <textarea id="custom-background" rows="3" required placeholder="請描述這棟建築內的任務情境與需要協助外國人的事項..."></textarea>
+        </label>
+
+        <label class="form-field span-2">
+          <span>過關任務目標 1 *</span>
+          <input id="custom-obj-1" type="text" required placeholder="例如：親切招呼客人並確認想看的電影場次與張數" />
+        </label>
+
+        <label class="form-field span-2">
+          <span>過關任務目標 2 *</span>
+          <input id="custom-obj-2" type="text" required placeholder="例如：推薦甜鹹爆米花與飲料套餐" />
+        </label>
+
+        <label class="form-field span-2">
+          <span>過關任務目標 3</span>
+          <input id="custom-obj-3" type="text" placeholder="例如：告知總金額與影廳在三樓" />
+        </label>
+
+        <label class="form-field span-2">
+          <span>NPC 開場白 (英文，選填)</span>
+          <input id="custom-opening-line" type="text" placeholder="Hi there! Could I get two tickets for the 7 PM movie, please?" />
+        </label>
+
+        <div class="modal-footer span-2">
+          <button type="submit" class="btn-primary-large full-width">🏗️ 建造並啟用此自訂職場建築</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 3: CHANCE / DESTINY / METRO TRANSIT EVENT MODAL -->
+  <div id="board-event-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card richman-event-modal-card">
+      <div class="modal-header">
+        <h3 id="event-modal-title">🎲 大富翁城市奇遇事件</h3>
+        <button id="close-event-modal-btn" class="btn-close">✕</button>
+      </div>
+      <div id="event-modal-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="confirm-event-modal-btn" class="btn-primary-large full-width">太棒了！繼續前進</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="app-toast" class="app-toast hidden"></div>
+
+  <script src="./scenarios.js"></script>
+  <script src="./audio-engine.js"></script>
+  <script src="./gemini-service.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

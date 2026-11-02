@@ -557,6 +557,63 @@
     /**
      * Renders the 5x5 SimCity 3D Richman Board + 3D Extruded Buildings + 3D Rolling Dice Cube
      */
+    /**
+     * Builds one true 3D cuboid (front/back/left/right walls + roof) with CSS 3D transforms.
+     * (x,y) = offset of the cuboid center on the tile plane, z = base height.
+     */
+    cuboid(w, d, h, { x = 0, y = 0, z = 0, colors, cls = '', icon = '' } = {}) {
+      const c = colors || {};
+      return `
+        <div class="bld-box ${cls}" style="--w:${w}px;--d:${d}px;--h:${h}px;--roof:${c.roof};--front:${c.front};--side:${c.side};transform:translate3d(${x}px,${y}px,${z + h / 2}px) rotateX(-90deg);">
+          <div class="bld-face bld-f-front"><span class="bld-face-emoji">${icon}</span></div>
+          <div class="bld-face bld-f-back"></div>
+          <div class="bld-face bld-f-right"></div>
+          <div class="bld-face bld-f-left"></div>
+          <div class="bld-face bld-f-top"></div>
+        </div>`;
+    }
+
+    buildVolumetricBuilding(level, colors, icon) {
+      if (level === -1) {
+        // Special tile: low plinth with icon on the front wall
+        return `<div class="bld-stage" title="特殊地塊">${this.cuboid(40, 40, 12, { colors, icon })}</div>`;
+      }
+      if (level === 0) {
+        // Construction site: foundation slab + hazard posts + crane arm
+        return `<div class="bld-stage lv-0" title="未開發地皮 (待建案開工)">
+          ${this.cuboid(46, 40, 5, { colors: { roof: '#78716c', front: '#57534e', side: '#44403c' }, cls: 'bld-slab' })}
+          ${this.cuboid(5, 5, 22, { x: -18, y: -14, z: 5, colors: { roof: '#facc15', front: '#eab308', side: '#ca8a04' } })}
+          ${this.cuboid(5, 5, 22, { x: 18, y: -14, z: 5, colors: { roof: '#facc15', front: '#eab308', side: '#ca8a04' } })}
+          ${this.cuboid(4, 4, 34, { x: 12, y: 8, z: 5, colors: { roof: '#fb923c', front: '#f97316', side: '#ea580c' } })}
+          ${this.cuboid(30, 3, 3, { x: -2, y: 8, z: 39, colors: { roof: '#fb923c', front: '#f97316', side: '#ea580c' } })}
+        </div>`;
+      }
+      if (level === 1) {
+        // Lv.1 street shop: single low box + awning + sign
+        return `<div class="bld-stage lv-1" title="Lv.1 街邊門市 (★☆☆)">
+          ${this.cuboid(44, 38, 28, { colors, cls: 'bld-windows bld-w-1', icon })}
+          ${this.cuboid(48, 14, 4, { y: 22, z: 20, colors: { roof: '#fde047', front: '#f59e0b', side: '#d97706' } })}
+        </div>`;
+      }
+      if (level === 2) {
+        // Lv.2 mid-rise: podium + tower + rooftop unit
+        return `<div class="bld-stage lv-2" title="Lv.2 旗艦商業大樓 (★★☆)">
+          ${this.cuboid(50, 42, 16, { colors, cls: 'bld-windows bld-w-1' })}
+          ${this.cuboid(38, 32, 46, { z: 16, colors, cls: 'bld-windows bld-w-2 bld-glass', icon })}
+          ${this.cuboid(14, 12, 8, { x: 6, y: -4, z: 62, colors: { roof: '#94a3b8', front: '#64748b', side: '#475569' } })}
+        </div>`;
+      }
+      // Lv.3 landmark skyscraper: podium + tower + setback + crown + antenna
+      const gold = { roof: '#fde047', front: '#d97706', side: '#92400e' };
+      return `<div class="bld-stage lv-3" title="Lv.3 摩天大樓地標 (★★★)">
+        ${this.cuboid(52, 44, 14, { colors, cls: 'bld-windows bld-w-1' })}
+        ${this.cuboid(38, 34, 60, { z: 14, colors: gold, cls: 'bld-windows bld-w-3 bld-gold', icon: '🏙️' })}
+        ${this.cuboid(26, 24, 26, { z: 74, colors: gold, cls: 'bld-windows bld-w-3 bld-gold' })}
+        ${this.cuboid(14, 14, 8, { z: 100, colors: { roof: '#fef08a', front: '#fbbf24', side: '#d97706' } })}
+        ${this.cuboid(3, 3, 24, { z: 108, colors: { roof: '#ef4444', front: '#dc2626', side: '#b91c1c' }, cls: 'bld-beacon' })}
+      </div>`;
+    }
+
     renderSimCityBoard() {
       const grid = document.getElementById('simcity-board-grid');
       if (!grid || !BOARD_TILES) return;
@@ -589,70 +646,21 @@
           ? `Lv.${bldLevel} · 獎金 $${(scenarioObj.baseReward || 1200).toLocaleString()}`
           : tile.rewardText;
 
-        // 3D Architectural Facade Model
+        // TRUE 3D VOLUMETRIC BUILDING (real cuboids with 4 walls + roof)
         let bld3DHtml = '';
         if (tile.type === 'scenario' || tile.type === 'ai-lot') {
-          if (bldLevel === 0) {
-            bld3DHtml = `
-              <div class="bld-3d-model lv-0" title="未開發地皮 (待建案開工)">
-                <div class="bld-3d-facade">
-                  <span>🚧</span>
-                </div>
-              </div>
-            `;
-          } else if (bldLevel === 1) {
-            bld3DHtml = `
-              <div class="bld-3d-model lv-1" title="Lv.1 街邊門市 (★☆☆)">
-                <div class="bld-3d-facade">
-                  <span class="bld-emoji">${displayIcon}</span>
-                  <div class="bld-windows-grid">
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                  </div>
-                </div>
-              </div>
-            `;
-          } else if (bldLevel === 2) {
-            bld3DHtml = `
-              <div class="bld-3d-model lv-2" title="Lv.2 旗艦商業大樓 (★★☆)">
-                <div class="bld-3d-facade">
-                  <span class="bld-emoji">${displayIcon}</span>
-                  <div class="bld-windows-grid">
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                  </div>
-                </div>
-              </div>
-            `;
-          } else {
-            bld3DHtml = `
-              <div class="bld-3d-model lv-3" title="Lv.3 摩天大樓地標 (★★★)">
-                <div class="bld-3d-antenna"></div>
-                <div class="bld-3d-facade">
-                  <span class="bld-emoji">🏙️</span>
-                  <div class="bld-windows-grid">
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                    <span class="bld-window-pane"></span>
-                  </div>
-                </div>
-              </div>
-            `;
-          }
+          const colors = {
+            roof: scenarioObj?.roofColor || '#3b82f6',
+            front: scenarioObj?.wallColorLeft || '#2563eb',
+            side: scenarioObj?.wallColorRight || '#1d4ed8'
+          };
+          bld3DHtml = this.buildVolumetricBuilding(bldLevel, colors, displayIcon);
         } else {
-          // Special corner or chance tile 3D token
-          bld3DHtml = `
-            <div class="bld-3d-model lv-special">
-              <div class="bld-3d-facade" style="border-color:${tile.zoneColor};">
-                <span style="font-size:1.65rem;">${displayIcon}</span>
-              </div>
-            </div>
-          `;
+          bld3DHtml = this.buildVolumetricBuilding(-1, {
+            roof: tile.zoneColor || '#64748b',
+            front: '#334155',
+            side: '#1e293b'
+          }, displayIcon);
         }
 
         return `

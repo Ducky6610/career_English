@@ -399,6 +399,31 @@
         this.islandCity?.resetView();
       });
 
+      // 3D FX & Performance Toggles (Bloom, Tilt-Shift, Instanced City)
+      const bloomBtn = document.getElementById('toggle-bloom-btn');
+      bloomBtn?.addEventListener('click', () => {
+        const on = this.islandCity?.toggleBloom();
+        bloomBtn.classList.toggle('active-fx', !!on);
+        bloomBtn.textContent = `✨ 輝光: ${on ? '開' : '關'}`;
+        this.showToast(on ? '✨ 已開啟 Bloom 輝光後處理通道' : '✨ 已關閉 Bloom 輝光通道');
+      });
+
+      const tiltBtn = document.getElementById('toggle-tiltshift-btn');
+      tiltBtn?.addEventListener('click', () => {
+        const on = this.islandCity?.toggleTiltShift();
+        tiltBtn.classList.toggle('active-fx', !!on);
+        tiltBtn.textContent = `📷 移軸景深: ${on ? '開' : '關'}`;
+        this.showToast(on ? '📷 已啟用移軸鏡頭景深 (微縮模型感)' : '📷 已關閉移軸鏡頭景深');
+      });
+
+      const instancedBtn = document.getElementById('toggle-instanced-btn');
+      instancedBtn?.addEventListener('click', () => {
+        const on = this.islandCity?.toggleInstancedCity();
+        instancedBtn.classList.toggle('active-fx', !!on);
+        instancedBtn.textContent = `🏙️ 萬棟城: ${on ? '1.8k' : '關閉'}`;
+        this.showToast(on ? '🏙️ 已載入 1,800+ 棟 InstancedMesh 大都會群 (單次 Draw Call 60FPS)' : '🏙️ 已隱藏背景建築群');
+      });
+
       // Building task modal handlers
       const taskModal = document.getElementById('building-task-modal');
       document.getElementById('close-task-modal-btn')?.addEventListener('click', () => {

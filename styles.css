@@ -2840,6 +2840,58 @@ body {
   transform: translateY(-1px);
 }
 
+/* Graphics & Performance Controls HUD Bar */
+.island-fx-bar {
+  position: absolute;
+  bottom: 120px;
+  right: 16px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.fx-pill {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 5px 11px;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease;
+}
+
+.fx-pill:hover {
+  background: rgba(30, 41, 59, 0.95);
+  border-color: #38bdf8;
+  color: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.fx-pill.active-fx {
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.fx-pill.fx-status {
+  cursor: default;
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.35);
+  background: rgba(6, 78, 59, 0.3);
+}
+
 /* LIVE CLASSMATES QUICK HUD BAR */
 .island-live-users-hud {
   position: absolute;
@@ -3525,6 +3577,28 @@ body {
     font-size: 0.7rem;
   }
 
+  /* Mobile FX & Graphics HUD Bar */
+  .island-fx-bar {
+    bottom: 82px;
+    right: 8px;
+    left: 8px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .island-fx-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .island-fx-bar .fx-pill {
+    padding: 4px 8px;
+    font-size: 0.68rem;
+    flex-shrink: 0;
+  }
+
   /* Mobile Live Feed Bottom Sheet Drawer */
   .island-feed {
     display: none;
@@ -3725,6 +3799,21 @@ body {
 
   .hint-btns {
     justify-content: flex-end;
+  }
+
+  /* Mobile App Toast */
+  .app-toast {
+    bottom: auto;
+    top: 76px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 90vw;
+    font-size: 0.8rem;
+    padding: 8px 16px;
+    border-radius: 999px;
+    z-index: 999;
   }
 }
 

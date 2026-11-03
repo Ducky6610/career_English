@@ -34,7 +34,20 @@
   function mat(color, extra) {
     const key = color + (extra ? JSON.stringify(extra) : '');
     if (!matCache.has(key)) {
-      matCache.set(key, new T.MeshLambertMaterial(Object.assign({ color }, extra || {})));
+      matCache.set(
+        key,
+        new T.MeshStandardMaterial(
+          Object.assign(
+            {
+              color,
+              roughness: 0.38,
+              metalness: 0.22,
+              envMapIntensity: 1.25
+            },
+            extra || {}
+          )
+        )
+      );
     }
     return matCache.get(key);
   }
@@ -95,7 +108,15 @@
     let m;
     if (opts.glass) {
       const tex = glassTowerTexture(opts.tint || 'blue');
-      m = new T.Mesh(geo, new T.MeshLambertMaterial({ map: tex }));
+      m = new T.Mesh(
+        geo,
+        new T.MeshStandardMaterial({
+          map: tex,
+          roughness: 0.12,
+          metalness: 0.85,
+          envMapIntensity: 2.0
+        })
+      );
     } else {
       m = new T.Mesh(geo, mat(wall));
     }
@@ -359,8 +380,18 @@
     const tz = base.clone();
     tz.needsUpdate = true;
     tz.repeat.set(colsZ, floors);
-    const sideX = new T.MeshLambertMaterial({ map: tz });
-    const sideZ = new T.MeshLambertMaterial({ map: tx });
+    const sideX = new T.MeshStandardMaterial({
+      map: tz,
+      roughness: 0.18,
+      metalness: 0.75,
+      envMapIntensity: 1.8
+    });
+    const sideZ = new T.MeshStandardMaterial({
+      map: tx,
+      roughness: 0.18,
+      metalness: 0.75,
+      envMapIntensity: 1.8
+    });
     const roofM = mat(roof);
     const m = new T.Mesh(new T.BoxGeometry(w, h, d), [sideX, sideX, roofM, roofM, sideZ, sideZ]);
     m.position.set(x, y + h / 2, z);
@@ -625,16 +656,16 @@
       }
       roundedBox(g, 4.4, 2.4, 3.2, 0.4, '#f8fafc', 0, 0, -0.6);
       const fascia = box(g, 4.5, 0.65, 0.35, '#ffffff', 0, 2.05, 0.95);
-      fascia.material = new T.MeshLambertMaterial({ map: convenienceFasciaTexture() });
+      fascia.material = new T.MeshStandardMaterial({ map: convenienceFasciaTexture(), roughness: 0.25, metalness: 0.2, emissive: '#ffffff', emissiveIntensity: 0.25 });
       const glassFront = box(g, 3.8, 1.7, 0.05, '#ffffff', 0, 0.1, 0.98);
-      glassFront.material = new T.MeshLambertMaterial({ map: storefrontGlassTexture('mart') });
+      glassFront.material = new T.MeshStandardMaterial({ map: storefrontGlassTexture('mart'), roughness: 0.1, metalness: 0.85, envMapIntensity: 2.0 });
       const vm = roundedBox(g, 0.7, 1.5, 0.6, 0.08, '#0284c7', 2.4, 0, 0.8);
-      vm.material = new T.MeshLambertMaterial({ map: vendingMachineTexture() });
+      vm.material = new T.MeshStandardMaterial({ map: vendingMachineTexture(), roughness: 0.25, metalness: 0.45, envMapIntensity: 1.5 });
       cyl(g, 0.18, 0.16, 0.6, '#16a34a', -2.3, 0, 1.8, 14);
       cyl(g, 0.18, 0.16, 0.6, '#0284c7', -2.6, 0, 1.8, 14);
       cyl(g, 0.08, 0.08, 3.6, '#cbd5e1', -2.2, 0, 2.2, 12);
       const signHead = roundedBox(g, 0.85, 0.75, 0.25, 0.15, '#ea580c', -2.2, 3.6, 2.2);
-      signHead.material = new T.MeshLambertMaterial({ map: convenienceFasciaTexture() });
+      signHead.material = new T.MeshStandardMaterial({ map: convenienceFasciaTexture(), roughness: 0.25, metalness: 0.2, emissive: '#ea580c', emissiveIntensity: 0.35 });
       roundedBox(g, 1.0, 0.6, 0.8, 0.1, '#94a3b8', -1.2, 2.4, -0.6);
       cyl(g, 0.25, 0.25, 0.15, '#475569', -1.2, 3.0, -0.6, 16);
       return;
@@ -643,15 +674,15 @@
       roundedBox(g, 5.0, 2.2, 4.4, 0.45, '#f8fafc', 0, 0, 0);
       box(g, 5.0, 0.04, 1.4, '#334155', 0, 0, 2.6);
       const fascia = box(g, 5.1, 0.7, 0.35, '#ffffff', 0, 1.85, 2.15);
-      fascia.material = new T.MeshLambertMaterial({ map: convenienceFasciaTexture() });
+      fascia.material = new T.MeshStandardMaterial({ map: convenienceFasciaTexture(), roughness: 0.25, metalness: 0.2, emissive: '#ffffff', emissiveIntensity: 0.25 });
       const glassFront = box(g, 4.2, 1.5, 0.05, '#ffffff', 0, 0.1, 2.18);
-      glassFront.material = new T.MeshLambertMaterial({ map: storefrontGlassTexture('mart') });
+      glassFront.material = new T.MeshStandardMaterial({ map: storefrontGlassTexture('mart'), roughness: 0.1, metalness: 0.85, envMapIntensity: 2.0 });
       curvedTower(g, 4.2, 3.2, 3.6, 0.45, '#f8fafc', '#e2e8f0', 0, 2.2, -0.3, { glass: true });
       box(g, 4.2, 0.4, 0.06, '#94a3b8', 0, 2.2, 1.7);
       buildSoftTree(g, -2.4, 2.6, 0.7);
       buildSoftTree(g, 2.4, 2.6, 0.7);
       const vm = roundedBox(g, 0.7, 1.5, 0.6, 0.08, '#0284c7', 2.3, 0, 2.6);
-      vm.material = new T.MeshLambertMaterial({ map: vendingMachineTexture() });
+      vm.material = new T.MeshStandardMaterial({ map: vendingMachineTexture(), roughness: 0.25, metalness: 0.45, envMapIntensity: 1.5 });
       roundedBox(g, 1.4, 0.7, 1.2, 0.12, '#64748b', -0.8, 5.4, -0.4);
       cyl(g, 0.35, 0.35, 0.2, '#334155', -0.8, 6.1, -0.4, 16);
       return;
@@ -671,9 +702,9 @@
       roundedBox(g, 4.4, 2.6, 3.4, 0.4, wood, 0, 0, -0.5);
       const awn = box(g, 4.2, 0.28, 1.2, '#ffffff', 0, 2.15, 1.45);
       awn.rotation.x = 0.22;
-      awn.material = new T.MeshLambertMaterial({ map: awningTexture('#ffffff', accent) });
+      awn.material = new T.MeshStandardMaterial({ map: awningTexture('#ffffff', accent), roughness: 0.55, metalness: 0.1 });
       const glassFront = box(g, 3.6, 1.6, 0.05, '#ffffff', 0, 0.1, 1.18);
-      glassFront.material = new T.MeshLambertMaterial({ map: storefrontGlassTexture('cafe') });
+      glassFront.material = new T.MeshStandardMaterial({ map: storefrontGlassTexture('cafe'), roughness: 0.1, metalness: 0.85, envMapIntensity: 2.0 });
       const logo = cyl(g, 0.5, 0.5, 0.08, '#ffffff', 0, 2.7, 1.2, 24);
       logo.rotation.x = Math.PI / 2;
       cyl(g, 0.42, 0.42, 0.09, accent, 0, 2.7, 1.22, 24).rotation.x = Math.PI / 2;
@@ -703,7 +734,7 @@
     curvedTower(g, 5.4, 2.4, 5.0, 0.55, c.wall, c.roof, 0, 0, 0, {});
     if (fasciaTex) {
       const f = box(g, 4.8, 0.7, 0.3, '#ffffff', 0, 1.9, 2.45);
-      f.material = new T.MeshLambertMaterial({ map: fasciaTex });
+      f.material = new T.MeshStandardMaterial({ map: fasciaTex, roughness: 0.25, metalness: 0.2, emissive: '#ffffff', emissiveIntensity: 0.3 });
     } else {
       box(g, 3.2, 0.14, 1.4, '#ffffff', 0, 1.8, 2.6);
       cyl(g, 0.14, 0.14, 1.8, '#cbd5e1', -1.3, 0, 3.1, 12);
@@ -712,7 +743,7 @@
     curvedTower(g, 4.2, 5.4, 4.0, 0.5, '#0284c7', '#38bdf8', 0, 2.4, 0, { glass: true });
     curvedTower(g, 3.2, 3.6, 3.0, 0.45, gold, '#fde047', 0, 7.8, 0, { glass: true });
     const heli = box(g, 2.2, 0.08, 2.2, '#334155', 0, 11.4, 0);
-    heli.material = new T.MeshLambertMaterial({ map: helipadTexture() });
+    heli.material = new T.MeshStandardMaterial({ map: helipadTexture(), roughness: 0.5, metalness: 0.25 });
     cyl(g, 0.06, 0.1, 2.6, '#e2e8f0', 0, 11.48, 0, 12);
     const beacon = sphere(g, 0.22, '#ef4444', 0, 14.1, 0, { emissive: '#ef4444', emissiveIntensity: 1 });
     g.userData.beacon = beacon;
@@ -766,7 +797,7 @@
       curvedTower(g, 4.6, 2.8, 3.6, 0.4, '#1e293b', '#06b6d4', 0, 0, 0, { glass: true });
       const sol = box(g, 3.2, 0.08, 1.6, '#1e3a8a', 0, 2.85, -0.2);
       sol.rotation.x = -0.25;
-      sol.material = new T.MeshLambertMaterial({ map: solarPanelTexture() });
+      sol.material = new T.MeshStandardMaterial({ map: solarPanelTexture(), roughness: 0.12, metalness: 0.9, envMapIntensity: 2.2 });
       roundedBox(g, 0.35, 0.85, 0.25, 0.08, '#ffffff', 2.0, 0, 1.8);
       box(g, 0.25, 0.25, 0.05, '#10b981', 2.0, 0.5, 1.95, { emissive: '#10b981', emissiveIntensity: 0.8 });
       buildSoftTree(g, -2.2, 2.0, 0.7);
@@ -778,7 +809,7 @@
       roundedBox(g, 1.2, 1.0, 1.8, 0.25, '#38bdf8', 0, 2.1, 0, { transparent: true, opacity: 0.88 });
       const sol = box(g, 2.0, 0.08, 2.6, '#1e3a8a', 1.3, 3.45, 0);
       sol.rotation.x = -0.2;
-      sol.material = new T.MeshLambertMaterial({ map: solarPanelTexture() });
+      sol.material = new T.MeshStandardMaterial({ map: solarPanelTexture(), roughness: 0.12, metalness: 0.9, envMapIntensity: 2.2 });
       buildSoftTree(g, 0, 2.4, 0.8);
       return;
     }
@@ -837,7 +868,7 @@
         } else {
           cyl(g, 1.9, 2.1, 0.4, accent, 0, 0, 0, 32);
           cyl(g, 1.3, 1.5, 0.45, '#fff7ed', 0, 0.4, 0, 32);
-          const q = new T.Mesh(new T.BoxGeometry(1.7, 1.7, 1.7), new T.MeshLambertMaterial({ map: questionTexture(), emissive: '#f59e0b', emissiveIntensity: 0.4 }));
+          const q = new T.Mesh(new T.BoxGeometry(1.7, 1.7, 1.7), new T.MeshStandardMaterial({ map: questionTexture(), roughness: 0.25, metalness: 0.35, emissive: '#f59e0b', emissiveIntensity: 0.85 }));
           q.position.y = 2.2;
           q.castShadow = true;
           g.add(q);
@@ -896,6 +927,332 @@
     }
   }
 
+  /* ------------------------------------------- HDR Environment Map Generator */
+  function createHDREnvironmentMap(renderer) {
+    if (!renderer || !T.PMREMGenerator) return null;
+    const pmrem = new T.PMREMGenerator(renderer);
+    if (pmrem.compileEquirectangularShader) pmrem.compileEquirectangularShader();
+
+    const w = 512, h = 256;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+
+    // Vibrant physical sky radiance gradient (Zenith deep azure -> horizon glow -> ground bounce)
+    const skyGrad = g.createLinearGradient(0, 0, 0, h);
+    skyGrad.addColorStop(0.0, '#1d4ed8');   // Cobalt blue zenith
+    skyGrad.addColorStop(0.35, '#38bdf8');  // Sky azure
+    skyGrad.addColorStop(0.51, '#e0f2fe');  // Luminous horizon band
+    skyGrad.addColorStop(0.55, '#fef08a');  // Warm sunlight rim
+    skyGrad.addColorStop(0.60, '#64748b');  // Earth shadow haze
+    skyGrad.addColorStop(1.0, '#0f172a');   // Ground bounce
+    g.fillStyle = skyGrad;
+    g.fillRect(0, 0, w, h);
+
+    // Radiant HDR sun disc
+    const sunGrad = g.createRadialGradient(w * 0.42, h * 0.24, 2, w * 0.42, h * 0.24, 48);
+    sunGrad.addColorStop(0.0, '#ffffff');
+    sunGrad.addColorStop(0.2, '#fffbeb');
+    sunGrad.addColorStop(0.5, '#fde047');
+    sunGrad.addColorStop(1.0, 'rgba(253, 224, 71, 0)');
+    g.fillStyle = sunGrad;
+    g.beginPath();
+    g.arc(w * 0.42, h * 0.24, 48, 0, Math.PI * 2);
+    g.fill();
+
+    // Stylized ambient light clouds in reflection map
+    g.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    g.fillRect(w * 0.1, h * 0.38, 120, 10);
+    g.fillRect(w * 0.6, h * 0.42, 140, 12);
+    g.fillRect(w * 0.3, h * 0.46, 80, 8);
+
+    const tex = new T.CanvasTexture(c);
+    tex.mapping = T.EquirectangularReflectionMapping;
+    const envMap = pmrem.fromEquirectangular(tex).texture;
+    pmrem.dispose();
+    return envMap;
+  }
+
+  /* --------------------------------- InstancedMesh Megacity Housing Engine */
+  class InstancedCitySystem {
+    constructor(scene, islandGroup) {
+      this.scene = scene;
+      this.islandGroup = islandGroup;
+      this.enabled = true;
+      this.targetCount = 1800;
+      this.group = new T.Group();
+      this.group.name = 'InstancedMegacity';
+      this.islandGroup.add(this.group);
+
+      this.boxGeo = new T.BoxGeometry(1, 1, 1);
+      this.roofGeo = new T.ConeGeometry(0.85, 0.8, 4);
+      this.roofGeo.rotateY(Math.PI / 4);
+      this.windowGeo = new T.PlaneGeometry(1, 1);
+
+      this.wallMat = new T.MeshStandardMaterial({
+        roughness: 0.42,
+        metalness: 0.2,
+        envMapIntensity: 1.25
+      });
+      this.roofMat = new T.MeshStandardMaterial({
+        roughness: 0.38,
+        metalness: 0.25,
+        envMapIntensity: 1.3
+      });
+      this.glassMat = new T.MeshStandardMaterial({
+        color: '#60a5fa',
+        roughness: 0.1,
+        metalness: 0.85,
+        envMapIntensity: 2.2
+      });
+
+      this.bldgMesh = null;
+      this.roofMesh = null;
+      this.windowMesh = null;
+
+      this.rebuild(this.targetCount);
+    }
+
+    rebuild(count) {
+      this.targetCount = count;
+      if (this.bldgMesh) { this.group.remove(this.bldgMesh); this.bldgMesh.dispose(); }
+      if (this.roofMesh) { this.group.remove(this.roofMesh); this.roofMesh.dispose(); }
+      if (this.windowMesh) { this.group.remove(this.windowMesh); this.windowMesh.dispose(); }
+
+      if (count <= 0) return;
+
+      this.bldgMesh = new T.InstancedMesh(this.boxGeo, this.wallMat, count);
+      this.roofMesh = new T.InstancedMesh(this.roofGeo, this.roofMat, count);
+      this.windowMesh = new T.InstancedMesh(this.windowGeo, this.glassMat, count);
+
+      this.bldgMesh.castShadow = true;
+      this.bldgMesh.receiveShadow = true;
+      this.roofMesh.castShadow = true;
+
+      const dummy = new T.Object3D();
+      const r = rng(1337);
+      const zonePalettes = [
+        ['#3b82f6', '#1d4ed8'],
+        ['#f59e0b', '#d97706'],
+        ['#10b981', '#047857'],
+        ['#ec4899', '#be185d'],
+        ['#f87171', '#b91c1c'],
+        ['#818cf8', '#4338ca'],
+        ['#e2e8f0', '#475569']
+      ];
+
+      for (let i = 0; i < count; i++) {
+        const angle = r() * Math.PI * 2;
+        const tier = r();
+        let dist, baseH, w, d;
+        if (tier < 0.45) {
+          dist = 22.5 + r() * 12;
+          baseH = 1.2 + r() * 1.8;
+          w = 1.4 + r() * 0.8;
+          d = 1.4 + r() * 0.8;
+        } else if (tier < 0.8) {
+          dist = 36 + r() * 22;
+          baseH = 2.5 + r() * 5.0;
+          w = 2.0 + r() * 1.2;
+          d = 2.0 + r() * 1.2;
+        } else {
+          dist = 60 + r() * 35;
+          baseH = 5.0 + r() * 14.0;
+          w = 2.6 + r() * 2.0;
+          d = 2.6 + r() * 2.0;
+        }
+
+        const x = Math.cos(angle) * dist;
+        const z = Math.sin(angle) * dist;
+        const y = -0.15;
+
+        const palette = zonePalettes[Math.floor(r() * zonePalettes.length)];
+        const wallColor = new T.Color(palette[0]);
+        const roofColor = new T.Color(palette[1]);
+
+        // Building Body
+        dummy.position.set(x, y + baseH / 2, z);
+        dummy.rotation.set(0, angle + Math.PI / 2 + (r() - 0.5) * 0.4, 0);
+        dummy.scale.set(w, baseH, d);
+        dummy.updateMatrix();
+        this.bldgMesh.setMatrixAt(i, dummy.matrix);
+        this.bldgMesh.setColorAt(i, wallColor);
+
+        // Roof
+        const roofH = Math.min(1.4, w * 0.65);
+        dummy.position.set(x, y + baseH + roofH / 2, z);
+        dummy.scale.set(w * 1.05, roofH, d * 1.05);
+        dummy.updateMatrix();
+        this.roofMesh.setMatrixAt(i, dummy.matrix);
+        this.roofMesh.setColorAt(i, roofColor);
+
+        // Reflective Windows
+        dummy.position.set(x, y + baseH * 0.6, z);
+        dummy.scale.set(w * 0.75, baseH * 0.45, 1);
+        dummy.translateZ(d * 0.51);
+        dummy.updateMatrix();
+        this.windowMesh.setMatrixAt(i, dummy.matrix);
+      }
+
+      this.bldgMesh.instanceMatrix.needsUpdate = true;
+      if (this.bldgMesh.instanceColor) this.bldgMesh.instanceColor.needsUpdate = true;
+      this.roofMesh.instanceMatrix.needsUpdate = true;
+      if (this.roofMesh.instanceColor) this.roofMesh.instanceColor.needsUpdate = true;
+      this.windowMesh.instanceMatrix.needsUpdate = true;
+
+      this.group.add(this.bldgMesh);
+      this.group.add(this.roofMesh);
+      this.group.add(this.windowMesh);
+    }
+
+    setVisible(v) {
+      this.enabled = v;
+      this.group.visible = v;
+    }
+  }
+
+  /* ---------------------- Post-Processing: Bloom + Tilt-Shift Miniature DoF */
+  class PostProcessingPipeline {
+    constructor(renderer, scene, camera, container) {
+      this.renderer = renderer;
+      this.scene = scene;
+      this.camera = camera;
+      this.container = container;
+      this.enabled = true;
+      this.bloomEnabled = true;
+      this.tiltShiftEnabled = true;
+      this.bloomStrength = 0.65;
+      this.focusY = 0.48;
+      this.focusRadius = 0.18;
+      this.maxBlur = 0.007;
+
+      this.orthoCam = new T.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+      this.quadGeo = new T.PlaneGeometry(2, 2);
+      this.postScene = new T.Scene();
+      this.quad = new T.Mesh(this.quadGeo);
+      this.postScene.add(this.quad);
+
+      this.sceneTarget = null;
+      this.bloomTargetH = null;
+      this.bloomTargetV = null;
+
+      this.brightMat = new T.ShaderMaterial({
+        uniforms: {
+          tDiffuse: { value: null },
+          uThreshold: { value: 0.65 },
+          uSmoothWidth: { value: 0.25 }
+        },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }',
+        fragmentShader: 'uniform sampler2D tDiffuse; uniform float uThreshold; uniform float uSmoothWidth; varying vec2 vUv; void main() { vec4 tex = texture2D(tDiffuse, vUv); float luma = dot(tex.rgb, vec3(0.2126, 0.7152, 0.0722)); float a = smoothstep(uThreshold, uThreshold + uSmoothWidth, luma); gl_FragColor = vec4(tex.rgb * a, 1.0); }'
+      });
+
+      this.blurMat = new T.ShaderMaterial({
+        uniforms: {
+          tDiffuse: { value: null },
+          uDirection: { value: new T.Vector2(0, 0) }
+        },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }',
+        fragmentShader: 'uniform sampler2D tDiffuse; uniform vec2 uDirection; varying vec2 vUv; void main() { vec4 s = vec4(0.0); vec2 d = uDirection * 1.5; s += texture2D(tDiffuse, vUv - d * 3.23) * 0.070; s += texture2D(tDiffuse, vUv - d * 1.38) * 0.316; s += texture2D(tDiffuse, vUv) * 0.428; s += texture2D(tDiffuse, vUv + d * 1.38) * 0.316; s += texture2D(tDiffuse, vUv + d * 3.23) * 0.070; gl_FragColor = s; }'
+      });
+
+      this.compositeMat = new T.ShaderMaterial({
+        uniforms: {
+          tDiffuse: { value: null },
+          tBloom: { value: null },
+          uBloomStrength: { value: this.bloomStrength },
+          uBloomEnabled: { value: 1.0 },
+          uTiltShiftEnabled: { value: 1.0 },
+          uFocusY: { value: this.focusY },
+          uFocusRadius: { value: this.focusRadius },
+          uMaxBlur: { value: this.maxBlur },
+          uResolution: { value: new T.Vector2(1, 1) }
+        },
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position, 1.0); }',
+        fragmentShader: 'uniform sampler2D tDiffuse; uniform sampler2D tBloom; uniform float uBloomStrength; uniform float uBloomEnabled; uniform float uTiltShiftEnabled; uniform float uFocusY; uniform float uFocusRadius; uniform float uMaxBlur; varying vec2 vUv; void main() { vec4 sceneColor; if (uTiltShiftEnabled > 0.5) { float dist = abs(vUv.y - uFocusY) - uFocusRadius; float blurAmount = clamp(dist / 0.32, 0.0, 1.0) * uMaxBlur; if (blurAmount > 0.0005) { vec4 col = vec4(0.0); float total = 0.0; for (float i = -4.0; i <= 4.0; i += 1.0) { float weight = exp(-0.5 * (i * i) / 4.0); col += texture2D(tDiffuse, vUv + vec2(0.0, i * blurAmount)) * weight; total += weight; } sceneColor = col / total; } else { sceneColor = texture2D(tDiffuse, vUv); } } else { sceneColor = texture2D(tDiffuse, vUv); } if (uBloomEnabled > 0.5) { vec4 bloom = texture2D(tBloom, vUv); sceneColor.rgb += bloom.rgb * uBloomStrength; } float vig = 1.0 - 0.18 * length(vUv - 0.5); sceneColor.rgb *= vig; gl_FragColor = sceneColor; }'
+      });
+
+      this.resize();
+    }
+
+    resize() {
+      const w = Math.max(2, this.container.clientWidth || window.innerWidth);
+      const h = Math.max(2, this.container.clientHeight || window.innerHeight);
+      const pr = Math.min(window.devicePixelRatio || 1, 2);
+      const rw = Math.floor(w * pr);
+      const rh = Math.floor(h * pr);
+
+      if (this.sceneTarget) this.sceneTarget.dispose();
+      if (this.bloomTargetH) this.bloomTargetH.dispose();
+      if (this.bloomTargetV) this.bloomTargetV.dispose();
+
+      this.sceneTarget = new T.WebGLRenderTarget(rw, rh, {
+        minFilter: T.LinearFilter,
+        magFilter: T.LinearFilter,
+        format: T.RGBAFormat,
+        depthBuffer: true
+      });
+      const bw = Math.floor(rw / 2);
+      const bh = Math.floor(rh / 2);
+      this.bloomTargetH = new T.WebGLRenderTarget(bw, bh, {
+        minFilter: T.LinearFilter,
+        magFilter: T.LinearFilter,
+        format: T.RGBAFormat
+      });
+      this.bloomTargetV = new T.WebGLRenderTarget(bw, bh, {
+        minFilter: T.LinearFilter,
+        magFilter: T.LinearFilter,
+        format: T.RGBAFormat
+      });
+
+      this.compositeMat.uniforms.uResolution.value.set(rw, rh);
+    }
+
+    render() {
+      if (!this.enabled || (!this.bloomEnabled && !this.tiltShiftEnabled)) {
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.scene, this.camera);
+        return;
+      }
+
+      // Step 1: Render 3D Scene into HDR Target
+      this.renderer.setRenderTarget(this.sceneTarget);
+      this.renderer.render(this.scene, this.camera);
+
+      if (this.bloomEnabled) {
+        // Step 2: Bright pass
+        const bw = this.bloomTargetH.width;
+        const bh = this.bloomTargetH.height;
+        this.brightMat.uniforms.tDiffuse.value = this.sceneTarget.texture;
+        this.quad.material = this.brightMat;
+        this.renderer.setRenderTarget(this.bloomTargetH);
+        this.renderer.render(this.postScene, this.orthoCam);
+
+        // Step 3: Horizontal Blur
+        this.blurMat.uniforms.tDiffuse.value = this.bloomTargetH.texture;
+        this.blurMat.uniforms.uDirection.value.set(1 / bw, 0);
+        this.quad.material = this.blurMat;
+        this.renderer.setRenderTarget(this.bloomTargetV);
+        this.renderer.render(this.postScene, this.orthoCam);
+
+        // Step 4: Vertical Blur
+        this.blurMat.uniforms.tDiffuse.value = this.bloomTargetV.texture;
+        this.blurMat.uniforms.uDirection.value.set(0, 1 / bh);
+        this.quad.material = this.blurMat;
+        this.renderer.setRenderTarget(this.bloomTargetH);
+        this.renderer.render(this.postScene, this.orthoCam);
+      }
+
+      // Step 5: Composite Tilt-Shift + Bloom
+      this.compositeMat.uniforms.tDiffuse.value = this.sceneTarget.texture;
+      this.compositeMat.uniforms.tBloom.value = this.bloomTargetH.texture;
+      this.compositeMat.uniforms.uBloomEnabled.value = this.bloomEnabled ? 1.0 : 0.0;
+      this.compositeMat.uniforms.uTiltShiftEnabled.value = this.tiltShiftEnabled ? 1.0 : 0.0;
+      this.quad.material = this.compositeMat;
+      this.renderer.setRenderTarget(null);
+      this.renderer.render(this.postScene, this.orthoCam);
+    }
+  }
+
   /* ---------------------------------------------------------------- class */
   class IslandCity {
     constructor(container, opts) {
@@ -926,12 +1283,24 @@
       r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       r.shadowMap.enabled = true;
       r.shadowMap.type = T.PCFSoftShadowMap;
+      r.toneMapping = T.ACESFilmicToneMapping;
+      r.toneMappingExposure = 1.18;
       r.domElement.className = 'island-canvas';
       container.appendChild(r.domElement);
 
       this.scene = new T.Scene();
       this.scene.background = this._skyTexture();
       this.scene.fog = new T.Fog(0xcfeaff, 110, 300);
+
+      // HDR Environment Map (HDRI / envMap) pre-filtered with PMREM
+      this.envMap = createHDREnvironmentMap(this.renderer);
+      if (this.envMap) {
+        this.scene.environment = this.envMap;
+      }
+
+      this.lodList = [];
+      this.isMobile = (container.clientWidth / Math.max(1, container.clientHeight)) < 0.85 || window.innerWidth < 768;
+
       this.camera = new T.PerspectiveCamera(42, 1, 0.5, 600);
       this.cam = {
         az: 0.75, el: 0.72, dist: 62,
@@ -942,12 +1311,19 @@
       this._buildLights();
       this._buildIsland();
       this._buildRoads();
+
+      // InstancedMesh thousands of houses engine (1,800+ buildings with single draw calls)
+      this.instancedCity = new InstancedCitySystem(this.scene, this.island);
+
       this._buildTiles();
       this._buildDecor();
       this._buildWalkers();
       this._buildSea();
       this._buildPlayer();
       this._bindInput();
+
+      // Post-Processing: Bloom + Tilt-Shift Miniature Diorama
+      this.postProcessor = new PostProcessingPipeline(this.renderer, this.scene, this.camera, this.container);
 
       this.clock = new T.Clock();
       this._resize();
@@ -993,34 +1369,34 @@
       this.scene.add(this.island);
       const rock = new T.Mesh(
         new T.CylinderGeometry(29.5, 25, 12, 48, 1),
-        new T.MeshLambertMaterial({ color: '#9a8571' })
+        new T.MeshStandardMaterial({ color: '#9a8571', roughness: 0.85, metalness: 0.1, flatShading: true })
       );
       rock.position.y = -6.3;
       rock.receiveShadow = true;
       this.island.add(rock);
       const under = new T.Mesh(
         new T.ConeGeometry(25, 14, 32),
-        new T.MeshLambertMaterial({ color: '#7d6b59' })
+        new T.MeshStandardMaterial({ color: '#7d6b59', roughness: 0.9, metalness: 0.1, flatShading: true })
       );
       under.rotation.x = Math.PI;
       under.position.y = -19;
       this.island.add(under);
       const grass = new T.Mesh(
         new T.CylinderGeometry(29.5, 29.5, 0.6, 48),
-        new T.MeshLambertMaterial({ color: '#86cf5b' })
+        new T.MeshStandardMaterial({ color: '#86cf5b', roughness: 0.78, metalness: 0.08 })
       );
       grass.position.y = -0.3;
       grass.receiveShadow = true;
       this.island.add(grass);
       const sand = new T.Mesh(
         new T.CylinderGeometry(30.3, 30.5, 0.5, 48),
-        new T.MeshLambertMaterial({ color: '#f1deaa' })
+        new T.MeshStandardMaterial({ color: '#f1deaa', roughness: 0.82, metalness: 0.05 })
       );
       sand.position.y = -0.55;
       this.island.add(sand);
       const inner = new T.Mesh(
         new T.CylinderGeometry(9.4, 9.4, 0.04, 48),
-        new T.MeshLambertMaterial({ color: '#9ae06b' })
+        new T.MeshStandardMaterial({ color: '#9ae06b', roughness: 0.75, metalness: 0.08 })
       );
       inner.position.y = 0.02;
       inner.receiveShadow = true;
@@ -1028,7 +1404,7 @@
       // pond
       const pond = new T.Mesh(
         new T.CylinderGeometry(2.6, 2.6, 0.06, 32),
-        new T.MeshLambertMaterial({ color: '#4cc3f0', transparent: true, opacity: 0.9 })
+        new T.MeshStandardMaterial({ color: '#38bdf8', roughness: 0.08, metalness: 0.8, transparent: true, opacity: 0.92, envMapIntensity: 2.0 })
       );
       pond.position.set(-5, 0.07, -4.5);
       this.island.add(pond);
@@ -1039,7 +1415,7 @@
         const rr = 26 + r() * 3;
         const m = new T.Mesh(
           new T.SphereGeometry(0.8 + r() * 0.9, 12, 10),
-          new T.MeshLambertMaterial({ color: '#8b7d6b' })
+          new T.MeshStandardMaterial({ color: '#8b7d6b', roughness: 0.8, metalness: 0.12 })
         );
         m.scale.set(1.2, 0.6, 1.0);
         m.position.set(Math.cos(a) * rr, -0.4 + r() * 0.3, Math.sin(a) * rr);
@@ -1078,7 +1454,7 @@
 
       const m = new T.Mesh(
         new T.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 16 }),
-        new T.MeshLambertMaterial({ color })
+        new T.MeshStandardMaterial({ color, roughness: 0.72, metalness: 0.12 })
       );
       m.rotation.x = -Math.PI / 2;
       m.position.y = y;
@@ -1148,13 +1524,13 @@
       // "you are here" ring + bouncing arrow
       this.hereRing = new T.Mesh(
         new T.TorusGeometry(3.3, 0.14, 10, 48),
-        new T.MeshBasicMaterial({ color: '#34d399', transparent: true, opacity: 0.95 })
+        new T.MeshStandardMaterial({ color: '#34d399', emissive: '#10b981', emissiveIntensity: 1.2, transparent: true, opacity: 0.95, roughness: 0.25, metalness: 0.5 })
       );
       this.hereRing.rotation.x = Math.PI / 2;
       this.island.add(this.hereRing);
       this.arrow = new T.Mesh(
         new T.ConeGeometry(0.55, 1.1, 8),
-        new T.MeshLambertMaterial({ color: '#facc15', emissive: '#ca8a04', emissiveIntensity: 0.6 })
+        new T.MeshStandardMaterial({ color: '#facc15', emissive: '#ca8a04', emissiveIntensity: 1.2, roughness: 0.2, metalness: 0.8 })
       );
       this.arrow.rotation.x = Math.PI;
       this.island.add(this.arrow);
@@ -1179,38 +1555,90 @@
       const lv = Number(info.level || 0);
       const isBld = tile.type === 'scenario' || (tile.type === 'ai-lot' && info.isBuilding);
 
+      // Level of Detail (LOD) multi-level mesh management
+      const lod = new T.LOD();
+      bldg.add(lod);
+      this.lodList[index] = lod;
+
+      const highGroup = new T.Group();
+      highGroup.name = 'LOD0_HighDetail';
+      const visLevel = Math.max(1, lv);
+
       if (isBld) {
         const sId = tile.scenarioId || '';
         const name = tile.name || '';
         const icon = tile.icon || '';
 
-        // Display base building (Lv 1) so city is vibrant from the start, upgrading to Lv 2 / Lv 3 on success
-        const visLevel = Math.max(1, lv);
-
         if (sId === 'shift-swap-request' || icon === '🏪' || name.includes('超商')) {
-          buildConvenienceStore(bldg, c, visLevel);
+          buildConvenienceStore(highGroup, c, visLevel);
         } else if (sId === 'cafe-barista-order' || icon === '☕' || name.includes('咖啡')) {
-          buildCafeBoba(bldg, c, visLevel, false);
+          buildCafeBoba(highGroup, c, visLevel, false);
         } else if (sId === 'bubble-tea-order' || icon === '🧋' || name.includes('奶茶')) {
-          buildCafeBoba(bldg, c, visLevel, true);
+          buildCafeBoba(highGroup, c, visLevel, true);
         } else if (sId === 'summer-internship-interview' || icon === '🚀' || name.includes('矽谷') || name.includes('新創')) {
-          buildTechPark(bldg, c, visLevel);
+          buildTechPark(highGroup, c, visLevel);
         } else {
-          buildCommercialTower(bldg, c, visLevel, tile);
+          buildCommercialTower(highGroup, c, visLevel, tile);
         }
       } else if (tile.type === 'ai-lot') {
-        buildConstruction(bldg, tile.zoneColor || '#8b5cf6');
+        buildConstruction(highGroup, tile.zoneColor || '#8b5cf6');
       } else {
-        buildSpecial(bldg, tile);
+        buildSpecial(highGroup, tile);
       }
 
-      bldg.traverse((o) => {
+      highGroup.traverse((o) => {
         if (o.isMesh) {
           o.castShadow = true;
           o.receiveShadow = true;
         }
       });
-      const bb = new T.Box3().setFromObject(bldg);
+      lod.addLevel(highGroup, 0);
+
+      // Measure dimensions for Mid & Low proxy box
+      const bb = new T.Box3().setFromObject(highGroup);
+      const bldgH = Math.max(2.4, bb.max.y - bb.min.y);
+      const bldgW = Math.max(2.6, Math.min(5.2, bb.max.x - bb.min.x));
+      const bldgD = Math.max(2.6, Math.min(5.2, bb.max.z - bb.min.z));
+
+      // LOD 1: Simplified Architectural Silhouette (Distance >= 65 desktop / 45 mobile)
+      const midGroup = new T.Group();
+      midGroup.name = 'LOD1_MediumDetail';
+      const midBody = new T.Mesh(
+        new T.BoxGeometry(bldgW * 0.95, bldgH * 0.88, bldgD * 0.95),
+        mat(c.wall, { roughness: 0.45, metalness: 0.22 })
+      );
+      midBody.position.y = (bldgH * 0.88) / 2;
+      midBody.castShadow = true;
+      midGroup.add(midBody);
+      const midRoof = new T.Mesh(
+        new T.BoxGeometry(bldgW, Math.max(0.3, bldgH * 0.12), bldgD),
+        mat(c.roof, { roughness: 0.38, metalness: 0.25 })
+      );
+      midRoof.position.y = bldgH * 0.88 + Math.max(0.3, bldgH * 0.12) / 2;
+      midGroup.add(midRoof);
+      lod.addLevel(midGroup, this.isMobile ? 45 : 65);
+
+      // LOD 2: Low-poly Proxy Box (低面數方塊, 8 vertices / 12 triangles) (Distance >= 110 desktop / 75 mobile)
+      const lowGroup = new T.Group();
+      lowGroup.name = 'LOD2_LowPolyProxyBox';
+      const proxyBox = new T.Mesh(
+        new T.BoxGeometry(bldgW, bldgH, bldgD),
+        mat(c.wall, { roughness: 0.65, metalness: 0.15 })
+      );
+      proxyBox.position.y = bldgH / 2;
+      proxyBox.castShadow = true;
+      lowGroup.add(proxyBox);
+      const proxyRoof = new T.Mesh(
+        new T.BoxGeometry(bldgW + 0.15, 0.22, bldgD + 0.15),
+        mat(c.roof, { roughness: 0.5, metalness: 0.2 })
+      );
+      proxyRoof.position.y = bldgH + 0.11;
+      lowGroup.add(proxyRoof);
+      lod.addLevel(lowGroup, this.isMobile ? 75 : 110);
+
+      // Preserve interactive animation pointers on bldg.userData
+      Object.assign(bldg.userData, highGroup.userData);
+
       const top = Math.max(2.6, bb.max.y - root.position.y);
       root.userData.top = top;
       root.userData.label.position.set(0, top + 1.25, 0);
@@ -1310,8 +1738,14 @@
       geo.rotateX(-Math.PI / 2);
       this.sea = new T.Mesh(
         geo,
-        new T.MeshPhongMaterial({
-          color: '#39a9e6', transparent: true, opacity: 0.93, flatShading: true, shininess: 60
+        new T.MeshStandardMaterial({
+          color: '#0284c7',
+          roughness: 0.1,
+          metalness: 0.75,
+          transparent: true,
+          opacity: 0.92,
+          envMapIntensity: 1.85,
+          flatShading: true
         })
       );
       this.sea.position.y = -5.2;
@@ -1656,6 +2090,8 @@
         this.cam.tDist = Math.max(this.cam.tDist, 60 * factor);
       }
       this.camera.updateProjectionMatrix();
+      if (this.postProcessor) this.postProcessor.resize();
+      this.isMobile = (w / Math.max(1, h)) < 0.85 || window.innerWidth < 768;
     }
 
     _loop() {
@@ -1667,7 +2103,11 @@
       const dt = Math.min(this.clock.getDelta(), 0.05);
       this.time += dt;
       this._update(dt);
-      this.renderer.render(this.scene, this.camera);
+      if (this.postProcessor) {
+        this.postProcessor.render();
+      } else {
+        this.renderer.render(this.scene, this.camera);
+      }
     }
 
     _update(dt) {
@@ -1685,6 +2125,35 @@
         c.target.z + c.dist * Math.cos(c.az) * Math.cos(c.el)
       );
       this.camera.lookAt(c.target);
+
+      // LOD multi-level detail update & diagnostic counter
+      if (this.lodList && this.lodList.length) {
+        let hi = 0, mid = 0, lo = 0;
+        this.lodList.forEach((lod) => {
+          if (!lod) return;
+          lod.update(this.camera);
+          const lvl = lod.getCurrentLevel ? lod.getCurrentLevel() : 0;
+          if (lvl === 0) hi++;
+          else if (lvl === 1) mid++;
+          else lo++;
+        });
+
+        if ((this._lodTick = (this._lodTick || 0) + 1) % 20 === 0) {
+          const pill = document.getElementById('lod-status-pill');
+          if (pill) {
+            if (lo > 0 && lo >= hi) {
+              pill.textContent = `⚡ LOD: 遠景低模 (${lo}棟)`;
+              pill.style.color = '#f59e0b';
+            } else if (mid > 0 && mid >= hi) {
+              pill.textContent = `⚡ LOD: 中景方塊 (${mid}棟)`;
+              pill.style.color = '#38bdf8';
+            } else {
+              pill.textContent = `⚡ LOD: 近景高模 (${hi}棟)`;
+              pill.style.color = '#34d399';
+            }
+          }
+        }
+      }
 
       // sea
       const pos = this.sea.geometry.attributes.position;
@@ -1758,18 +2227,18 @@
       // per-tile animation
       this.tileRoots.forEach((root) => {
         const idx = root.userData.tileIndex;
-        const bg = root.userData.bldg;
-        const u = bg.userData;
+        const bldg = root.userData.bldg;
+        const u = bldg.userData;
         const hov = idx === this.hoverIndex;
         const targetS = hov ? 1.06 : 1;
-        let s = bg.scale.x + (targetS - bg.scale.x) * Math.min(1, dt * 10);
+        let s = bldg.scale.x + (targetS - bldg.scale.x) * Math.min(1, dt * 10);
         if (u.popT) {
           u.popT += dt;
           const p = Math.min(1, u.popT / 0.7);
           s = p < 1 ? 0.2 + (1 - Math.pow(1 - p, 3)) * 0.8 + Math.sin(p * Math.PI) * 0.12 : 1;
           if (p >= 1) u.popT = 0;
         }
-        bg.scale.setScalar(s);
+        bldg.scale.setScalar(s);
         const pad = root.userData.pad;
         pad.material.emissive = pad.material.emissive || new T.Color();
         pad.material.emissive.set(hov ? '#555555' : idx === this.playerTile ? '#1a5c3a' : '#000000');
@@ -1785,6 +2254,52 @@
         if (u.jet) u.jet.scale.y = 0.8 + Math.sin(t * 6) * 0.2;
         if (u.screen) u.screen.material.emissiveIntensity = 0.5 + Math.abs(Math.sin(t * 3)) * 0.6;
       });
+
+      // Update LOD status pill every ~45 frames
+      this._lodFrameCount = (this._lodFrameCount || 0) + 1;
+      if (this._lodFrameCount % 45 === 0 && this.lodList && this.lodList.length) {
+        const pill = document.getElementById('lod-status-pill');
+        if (pill) {
+          const s = this.getLODStats();
+          pill.textContent = `⚡ LOD: ${s.hi}精 / ${s.mid}簡 / ${s.lo}塊`;
+        }
+      }
+    }
+
+    toggleBloom() {
+      if (!this.postProcessor) return false;
+      this.postProcessor.bloomEnabled = !this.postProcessor.bloomEnabled;
+      return this.postProcessor.bloomEnabled;
+    }
+
+    toggleTiltShift() {
+      if (!this.postProcessor) return false;
+      this.postProcessor.tiltShiftEnabled = !this.postProcessor.tiltShiftEnabled;
+      return this.postProcessor.tiltShiftEnabled;
+    }
+
+    toggleInstancedCity() {
+      if (!this.instancedCity) return false;
+      const next = !this.instancedCity.enabled;
+      this.instancedCity.setVisible(next);
+      return next;
+    }
+
+    setInstancedCount(n) {
+      if (!this.instancedCity) return;
+      this.instancedCity.rebuild(n);
+    }
+
+    getLODStats() {
+      let hi = 0, mid = 0, lo = 0;
+      (this.lodList || []).forEach((lod) => {
+        if (!lod) return;
+        const lvl = lod.getCurrentLevel ? lod.getCurrentLevel() : 0;
+        if (lvl === 0) hi++;
+        else if (lvl === 1) mid++;
+        else lo++;
+      });
+      return { hi, mid, lo, total: (this.lodList || []).length };
     }
   }
 

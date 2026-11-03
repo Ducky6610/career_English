@@ -145,6 +145,22 @@
           </button>
         </div>
 
+        <!-- GRAPHICS & PERFORMANCE CONTROLS (PBR / BLOOM / TILT-SHIFT / INSTANCED MESH / LOD) -->
+        <div class="island-fx-bar" id="island-fx-bar" aria-label="3D 光影與效能控制">
+          <button id="toggle-bloom-btn" class="fx-pill active-fx" type="button" title="切換 Bloom 輝光後處理通道">
+            ✨ 輝光: 開
+          </button>
+          <button id="toggle-tiltshift-btn" class="fx-pill active-fx" type="button" title="切換 移軸鏡頭微縮模型景深 (Tilt-Shift Depth of Field)">
+            📷 移軸景深: 開
+          </button>
+          <button id="toggle-instanced-btn" class="fx-pill active-fx" type="button" title="切換 InstancedMesh 千棟城鎮 (60FPS 單次 Draw Call 渲染)">
+            🏙️ 萬棟城: 1.8k
+          </button>
+          <span id="lod-status-pill" class="fx-pill fx-status" title="LOD 多層次細節系統 (近景精緻高模 / 遠景低面數方塊)">
+            ⚡ LOD: 動態方塊
+          </span>
+        </div>
+
         <aside class="island-feed" id="live-feed" aria-label="城市即時動態">
           <div class="feed-head">
             <strong>🌐 城市即時動態</strong>

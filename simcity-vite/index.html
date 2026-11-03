@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>SimCity 3D Web App (Vite + Three.js)</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <!-- FLOATING HUD -->
+    <header class="hud-header">
+      <div class="hud-brand">
+        <span class="hud-badge">SIMCITY 3D</span>
+        <h1 class="hud-title">都市規劃模擬器</h1>
+      </div>
+      <div class="hud-stats">
+        <div class="stat-chip" title="InstancedMesh 實例化建築總數">
+          <span class="chip-label">🏢 建築數量</span>
+          <span class="chip-val" id="stat-buildings">0</span>
+        </div>
+        <div class="stat-chip" title="當前 GPU Draw Calls (維持在個位數)">
+          <span class="chip-label">⚡ Draw Calls</span>
+          <span class="chip-val highlight-green" id="stat-drawcalls">0</span>
+        </div>
+        <div class="stat-chip" title="即時畫面幀率 (FPS)">
+          <span class="chip-label">🎯 幀率</span>
+          <span class="chip-val" id="stat-fps">60 FPS</span>
+        </div>
+        <div class="stat-chip" title="網格坐標">
+          <span class="chip-label">📍 游標地塊</span>
+          <span class="chip-val" id="stat-coords">--</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- FLOATING ACTION DOCK -->
+    <footer class="hud-dock">
+      <div class="dock-tips">
+        <span class="tip-pill">🖱️ 左鍵：建造建築（自動吸附網格）</span>
+        <span class="tip-pill">🔄 右鍵 / 拖曳：旋轉視角（地表防穿透）</span>
+        <span class="tip-pill">🔍 滾輪：俯仰縮放</span>
+      </div>
+      <div class="dock-actions">
+        <button id="btn-batch-build" class="hud-btn primary-btn" type="button" title="批次追加 50 棟隨機大樓以測試效能">
+          🏗️ 快速擴建 (+50)
+        </button>
+        <button id="btn-reset-cam" class="hud-btn" type="button" title="重設俯瞰視角">
+          🎥 重設視角
+        </button>
+        <button id="btn-clear-city" class="hud-btn danger-btn" type="button" title="清空所有建築">
+          🧹 清空都市
+        </button>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

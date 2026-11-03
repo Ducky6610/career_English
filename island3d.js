@@ -34,9 +34,23 @@
   function mat(color, extra) {
     const key = color + (extra ? JSON.stringify(extra) : '');
     if (!matCache.has(key)) {
-      matCache.set(key, new T.MeshLambertMaterial(Object.assign({ color }, extra || {})));
+      matCache.set(key, new T.MeshStandardMaterial(Object.assign({
+        color,
+        roughness: 0.45,
+        metalness: 0.04
+      }, extra || {})));
     }
     return matCache.get(key);
+  }
+
+  function makeGlowMat(color, intensity = 0.6) {
+    return new T.MeshStandardMaterial({
+      color,
+      emissive: color,
+      emissiveIntensity: intensity,
+      roughness: 0.25,
+      metalness: 0.05
+    });
   }
 
   function box(parent, w, h, d, color, x, y, z, extra) {
@@ -368,35 +382,382 @@
     return m;
   }
 
+  /* --------------------------------------------- SimCity Modular Props & Signboards */
+  function createBuildingSignboard(signText, borderHexCss = "#f472b6") {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+
+    // 圓潤膠囊白底 + 主題色外框
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = borderHexCss;
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    if (ctx.roundRect) {
+      ctx.roundRect(12, 12, 488, 104, 52);
+    } else {
+      ctx.rect(12, 12, 488, 104);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // 建築名稱文字
+    ctx.fillStyle = "#4a3540";
+    ctx.font = "900 42px 'Fredoka', 'Noto Sans TC', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(signText, 256, 66);
+
+    const tex = new T.CanvasTexture(canvas);
+    tex.colorSpace = T.SRGBColorSpace;
+    const signGeo = new T.PlaneGeometry(2.8, 0.7);
+    const signMat = new T.MeshBasicMaterial({ map: tex, transparent: true });
+    const signMesh = new T.Mesh(signGeo, signMat);
+    return signMesh;
+  }
+
+  function createRooftopHVAC(parent, x, y, z, scale = 1.0, animatedList = null) {
+    const hvac = new T.Group();
+    hvac.position.set(x, y, z);
+    hvac.scale.set(scale, scale, scale);
+
+    const b = new T.Mesh(new T.BoxGeometry(0.85, 0.55, 0.65), mat('#64748b', { roughness: 0.6 }));
+    b.position.y = 0.275;
+
+    const cowl = new T.Mesh(new T.CylinderGeometry(0.24, 0.26, 0.16, 18), mat('#334155', { roughness: 0.5 }));
+    cowl.position.y = 0.6;
+
+    const fan = new T.Mesh(new T.BoxGeometry(0.38, 0.04, 0.08), mat('#0f172a'));
+    fan.position.y = 0.66;
+    if (animatedList) animatedList.push({ mesh: fan, type: 'spinY', speed: 6.0 });
+
+    hvac.add(b, cowl, fan);
+    parent.add(hvac);
+    return hvac;
+  }
+
+  function createWaterTower(parent, x, y, z, scale = 1.0) {
+    const wt = new T.Group();
+    wt.position.set(x, y, z);
+    wt.scale.set(scale, scale, scale);
+
+    const steelMat = mat('#475569', { roughness: 0.5 });
+    for (const [lx, lz] of [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28]]) {
+      const leg = new T.Mesh(new T.CylinderGeometry(0.04, 0.04, 0.75, 8), steelMat);
+      leg.position.set(lx, 0.375, lz);
+      wt.add(leg);
+    }
+    const platform = new T.Mesh(new T.BoxGeometry(0.72, 0.06, 0.72), steelMat);
+    platform.position.y = 0.75;
+    wt.add(platform);
+
+    const woodMat = mat('#a16207', { roughness: 0.75 });
+    const tank = new T.Mesh(new T.CylinderGeometry(0.32, 0.32, 0.65, 20), woodMat);
+    tank.position.y = 1.1;
+    wt.add(tank);
+
+    const hoopMat = mat('#1e293b');
+    for (const hy of [0.9, 1.1, 1.3]) {
+      const hoop = new T.Mesh(new T.TorusGeometry(0.33, 0.018, 8, 20), hoopMat);
+      hoop.rotation.x = Math.PI / 2;
+      hoop.position.y = hy;
+      wt.add(hoop);
+    }
+
+    const coneRoof = new T.Mesh(new T.ConeGeometry(0.36, 0.3, 20), mat('#78350f'));
+    coneRoof.position.y = 1.55;
+    wt.add(coneRoof);
+
+    parent.add(wt);
+    return wt;
+  }
+
+  function createHelipad(parent, x, y, z, size = 1.6) {
+    const pad = new T.Group();
+    pad.position.set(x, y, z);
+
+    const base = new T.Mesh(new T.BoxGeometry(size, 0.06, size), mat('#334155', { roughness: 0.6 }));
+    base.position.y = 0.03;
+    pad.add(base);
+
+    const yellowMat = mat('#facc15', { roughness: 0.4 });
+    const border = new T.Mesh(new T.RingGeometry(size * 0.38, size * 0.44, 32), yellowMat);
+    border.rotation.x = -Math.PI / 2;
+    border.position.y = 0.065;
+    pad.add(border);
+
+    const hMat = mat('#ffffff', { roughness: 0.3 });
+    const h1 = new T.Mesh(new T.BoxGeometry(0.09, 0.015, 0.52), hMat);
+    h1.position.set(-0.18, 0.07, 0);
+    const h2 = new T.Mesh(new T.BoxGeometry(0.09, 0.015, 0.52), hMat);
+    h2.position.set(0.18, 0.07, 0);
+    const h3 = new T.Mesh(new T.BoxGeometry(0.28, 0.015, 0.09), hMat);
+    h3.position.set(0, 0.07, 0);
+    pad.add(h1, h2, h3);
+
+    const beaconMat = makeGlowMat(0x22c55e, 0.9);
+    const hs = size * 0.42;
+    for (const [bx, bz] of [[-hs, -hs], [hs, -hs], [-hs, hs], [hs, hs]]) {
+      const bMesh = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.08, 12), beaconMat);
+      bMesh.position.set(bx, 0.07, bz);
+      pad.add(bMesh);
+    }
+
+    parent.add(pad);
+    return pad;
+  }
+
+  function createAntennaMast(parent, x, y, z, height = 2.0, animatedList = null) {
+    const ant = new T.Group();
+    ant.position.set(x, y, z);
+
+    const steelMat = mat('#94a3b8', { roughness: 0.4, metalness: 0.3 });
+    const mast = new T.Mesh(new T.CylinderGeometry(0.03, 0.07, height, 12), steelMat);
+    mast.position.y = height * 0.5;
+    ant.add(mast);
+
+    const redGlow = makeGlowMat(0xef4444, 0.95);
+    const beacon = new T.Mesh(new T.SphereGeometry(0.09, 16, 16), redGlow);
+    beacon.position.y = height + 0.05;
+    ant.add(beacon);
+    if (animatedList) animatedList.push({ mesh: beacon, type: 'blink', speed: 3.0 });
+
+    parent.add(ant);
+    return ant;
+  }
+
+  function createSolarPanels(parent, x, y, z, count = 2) {
+    const panelGroup = new T.Group();
+    panelGroup.position.set(x, y, z);
+
+    const frameMat = mat('#64748b', { roughness: 0.4, metalness: 0.5 });
+    const pvMat = mat('#1e3a8a', { roughness: 0.2, metalness: 0.3 });
+
+    for (let i = 0; i < count; i++) {
+      const singlePanel = new T.Group();
+      singlePanel.position.set((i - (count - 1) * 0.5) * 0.72, 0.16, 0);
+      singlePanel.rotation.x = -Math.PI / 8;
+
+      const frame = new T.Mesh(new T.BoxGeometry(0.65, 0.04, 0.78), frameMat);
+      const pv = new T.Mesh(new T.BoxGeometry(0.6, 0.02, 0.73), pvMat);
+      pv.position.y = 0.02;
+      singlePanel.add(frame, pv);
+
+      const legs = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.24, 8), frameMat);
+      legs.position.set(0, -0.08, 0.24);
+      singlePanel.add(legs);
+
+      panelGroup.add(singlePanel);
+    }
+
+    parent.add(panelGroup);
+    return panelGroup;
+  }
+
+  function createTrafficLight(x, z, rotY = 0) {
+    const tl = new T.Group();
+    tl.position.set(x, 0.16, z);
+    tl.rotation.y = rotY;
+
+    const mastMat = mat('#1e293b', { roughness: 0.5 });
+    const post = new T.Mesh(new T.CylinderGeometry(0.06, 0.08, 1.85, 12), mastMat);
+    post.position.y = 0.925;
+    const arm = new T.Mesh(new T.CylinderGeometry(0.045, 0.05, 1.15, 12), mastMat);
+    arm.rotation.z = Math.PI / 2;
+    arm.position.set(0.55, 1.8, 0);
+
+    const boxMesh = new T.Mesh(new T.BoxGeometry(0.18, 0.48, 0.18), mastMat);
+    boxMesh.position.set(1.05, 1.62, 0);
+
+    const rLens = new T.Mesh(new T.SphereGeometry(0.05, 12, 12), makeGlowMat(0xef4444, 0.8));
+    rLens.position.set(1.05, 1.76, 0.09);
+    const yLens = new T.Mesh(new T.SphereGeometry(0.05, 12, 12), mat('#78350f'));
+    yLens.position.set(1.05, 1.62, 0.09);
+    const gLens = new T.Mesh(new T.SphereGeometry(0.05, 12, 12), makeGlowMat(0x22c55e, 0.8));
+    gLens.position.set(1.05, 1.48, 0.09);
+
+    tl.add(post, arm, boxMesh, rLens, yLens, gLens);
+    return tl;
+  }
+
+  function createGooseneckStreetLamp(x, z, rotY = 0) {
+    const lamp = new T.Group();
+    lamp.position.set(x, 0.22, z);
+    lamp.rotation.y = rotY;
+
+    const poleMat = mat('#1e293b', { roughness: 0.4 });
+    const base = new T.Mesh(new T.CylinderGeometry(0.1, 0.13, 0.22, 12), poleMat);
+    base.position.y = 0.11;
+    const pole = new T.Mesh(new T.CylinderGeometry(0.05, 0.065, 1.75, 12), poleMat);
+    pole.position.y = 0.98;
+
+    const curve = new T.Mesh(new T.TorusGeometry(0.32, 0.04, 10, 16, Math.PI / 2), poleMat);
+    curve.position.set(0.3, 1.72, 0);
+    curve.rotation.z = Math.PI;
+
+    const hood = new T.Mesh(new T.ConeGeometry(0.16, 0.11, 14), poleMat);
+    hood.position.set(0.62, 1.68, 0);
+
+    const bulb = new T.Mesh(new T.SphereGeometry(0.09, 14, 14), makeGlowMat(0xfef08a, 0.85));
+    bulb.position.set(0.62, 1.62, 0);
+
+    lamp.add(base, pole, curve, hood, bulb);
+    return lamp;
+  }
+
+  function createPedestrianBench(x, z, rotY = 0) {
+    const bench = new T.Group();
+    bench.position.set(x, 0.22, z);
+    bench.rotation.y = rotY;
+
+    const woodMat = mat('#b45309', { roughness: 0.6 });
+    const ironMat = mat('#1e293b', { roughness: 0.5 });
+
+    for (const bx of [-0.38, 0.38]) {
+      const leg = new T.Mesh(new T.BoxGeometry(0.06, 0.28, 0.32), ironMat);
+      leg.position.set(bx, 0.14, 0);
+      const backSupport = new T.Mesh(new T.BoxGeometry(0.06, 0.36, 0.06), ironMat);
+      backSupport.position.set(bx, 0.32, -0.13);
+      bench.add(leg, backSupport);
+    }
+
+    for (let s = 0; s < 3; s++) {
+      const slat = new T.Mesh(new T.BoxGeometry(0.92, 0.03, 0.08), woodMat);
+      slat.position.set(0, 0.27, -0.09 + s * 0.09);
+      bench.add(slat);
+    }
+    for (let b = 0; b < 2; b++) {
+      const backSlat = new T.Mesh(new T.BoxGeometry(0.92, 0.08, 0.03), woodMat);
+      backSlat.position.set(0, 0.38 + b * 0.1, -0.14);
+      bench.add(backSlat);
+    }
+    return bench;
+  }
+
+  function createSimCityVehicle(type = 'sedan', colorHex = 0xef4444) {
+    const g = new T.Group();
+    const bodyMat = mat(colorHex, { roughness: 0.35 });
+    const darkGlassMat = mat('#0f172a', { roughness: 0.15, metalness: 0.8 });
+    const wheelRubberMat = mat('#1e293b', { roughness: 0.8 });
+    const wheelHubMat = mat('#94a3b8', { roughness: 0.3, metalness: 0.6 });
+    const headlightMat = makeGlowMat(0xfef08a, 0.9);
+    const taillightMat = makeGlowMat(0xef4444, 0.85);
+
+    function addWheel(wx, wy, wz) {
+      const wGroup = new T.Group();
+      wGroup.position.set(wx, wy, wz);
+      const tire = new T.Mesh(new T.CylinderGeometry(0.13, 0.13, 0.08, 12), wheelRubberMat);
+      tire.rotation.z = Math.PI / 2;
+      const hub = new T.Mesh(new T.CylinderGeometry(0.075, 0.075, 0.085, 10), wheelHubMat);
+      hub.rotation.z = Math.PI / 2;
+      wGroup.add(tire, hub);
+      g.add(wGroup);
+    }
+
+    function addLights(frontZ, rearZ, width = 0.56, ly = 0.22) {
+      const hw = width * 0.5;
+      for (const lx of [-hw, hw]) {
+        const hl = new T.Mesh(new T.BoxGeometry(0.11, 0.08, 0.04), headlightMat);
+        hl.position.set(lx, ly, frontZ);
+        g.add(hl);
+      }
+      for (const rx of [-hw, hw]) {
+        const tl = new T.Mesh(new T.BoxGeometry(0.11, 0.08, 0.04), taillightMat);
+        tl.position.set(rx, ly, rearZ);
+        g.add(tl);
+      }
+    }
+
+    if (type === 'taxi') {
+      const taxiMat = mat('#facc15', { roughness: 0.3 });
+      const chassis = new T.Mesh(new T.BoxGeometry(0.78, 0.28, 1.58), taxiMat);
+      chassis.position.y = 0.22;
+      const cabin = new T.Mesh(new T.BoxGeometry(0.68, 0.28, 0.85), darkGlassMat);
+      cabin.position.set(0, 0.44, -0.05);
+      const roof = new T.Mesh(new T.BoxGeometry(0.64, 0.04, 0.8), taxiMat);
+      roof.position.set(0, 0.59, -0.05);
+      const sign = new T.Mesh(new T.BoxGeometry(0.28, 0.09, 0.12), makeGlowMat(0xfef08a, 0.8));
+      sign.position.set(0, 0.65, -0.05);
+      g.add(chassis, cabin, roof, sign);
+
+      addWheel(-0.38, 0.14, 0.48);
+      addWheel(0.38, 0.14, 0.48);
+      addWheel(-0.38, 0.14, -0.48);
+      addWheel(0.38, 0.14, -0.48);
+      addLights(0.8, -0.8, 0.56, 0.22);
+    } else if (type === 'truck') {
+      const cabMat = mat(colorHex || '#2563eb', { roughness: 0.4 });
+      const cab = new T.Mesh(new T.BoxGeometry(0.82, 0.5, 0.65), cabMat);
+      cab.position.set(0, 0.35, 0.62);
+      const windshield = new T.Mesh(new T.BoxGeometry(0.74, 0.25, 0.04), darkGlassMat);
+      windshield.position.set(0, 0.44, 0.94);
+      const cargo = new T.Mesh(new T.BoxGeometry(0.88, 0.62, 1.25), mat('#e2e8f0', { roughness: 0.4 }));
+      cargo.position.set(0, 0.44, -0.32);
+      g.add(cab, windshield, cargo);
+
+      addWheel(-0.42, 0.14, 0.62);
+      addWheel(0.42, 0.14, 0.62);
+      addWheel(-0.42, 0.14, -0.32);
+      addWheel(0.42, 0.14, -0.32);
+      addWheel(-0.42, 0.14, -0.74);
+      addWheel(0.42, 0.14, -0.74);
+      addLights(0.96, -0.96, 0.62, 0.22);
+    } else {
+      // sedan
+      const chassis = new T.Mesh(new T.BoxGeometry(0.78, 0.26, 1.55), bodyMat);
+      chassis.position.y = 0.21;
+      const cabin = new T.Mesh(new T.BoxGeometry(0.66, 0.27, 0.82), darkGlassMat);
+      cabin.position.set(0, 0.42, -0.06);
+      const roof = new T.Mesh(new T.BoxGeometry(0.62, 0.03, 0.78), bodyMat);
+      roof.position.set(0, 0.56, -0.06);
+      g.add(chassis, cabin, roof);
+
+      addWheel(-0.38, 0.14, 0.46);
+      addWheel(0.38, 0.14, 0.46);
+      addWheel(-0.38, 0.14, -0.46);
+      addWheel(0.38, 0.14, -0.46);
+      addLights(0.78, -0.78, 0.54, 0.22);
+    }
+
+    g.scale.setScalar(0.95);
+    return g;
+  }
+
+  /* --------------------------------------------- 2D/3D Floating Labels */
   function labelTexture(lines, opts) {
     opts = opts || {};
     const c = document.createElement('canvas');
     c.width = 512;
     c.height = lines.length > 1 ? 150 : 100;
     const g = c.getContext('2d');
-    const r = 26;
-    g.fillStyle = opts.bg || 'rgba(15,23,42,0.88)';
+    const r = 28;
+    g.fillStyle = opts.bg || 'rgba(255,255,255,0.96)';
     g.beginPath();
-    g.moveTo(r, 4);
-    g.arcTo(508, 4, 508, c.height - 4, r);
-    g.arcTo(508, c.height - 4, 4, c.height - 4, r);
-    g.arcTo(4, c.height - 4, 4, 4, r);
-    g.arcTo(4, 4, 508, 4, r);
-    g.closePath();
+    if (g.roundRect) {
+      g.roundRect(6, 6, 500, c.height - 12, r);
+    } else {
+      g.moveTo(r, 6);
+      g.arcTo(506, 6, 506, c.height - 6, r);
+      g.arcTo(506, c.height - 6, 6, c.height - 6, r);
+      g.arcTo(6, c.height - 6, 6, 6, r);
+      g.arcTo(6, 6, 506, 6, r);
+      g.closePath();
+    }
     g.fill();
-    g.lineWidth = 5;
-    g.strokeStyle = opts.border || '#fde047';
+    g.lineWidth = 6;
+    g.strokeStyle = opts.border || '#f472b6';
     g.stroke();
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillStyle = opts.fg || '#fff';
-    g.font = 'bold 44px "Noto Sans TC", "PingFang TC", sans-serif';
+    g.fillStyle = opts.fg || '#4a3540';
+    g.font = 'bold 44px "Fredoka", "Noto Sans TC", sans-serif';
     let name = lines[0];
     while (g.measureText(name).width > 470 && name.length > 3) name = name.slice(0, -2) + '…';
     g.fillText(name, 256, lines.length > 1 ? 52 : c.height / 2);
     if (lines.length > 1) {
-      g.font = 'bold 38px "Noto Sans TC", sans-serif';
-      g.fillStyle = opts.fg2 || '#fde047';
+      g.font = 'bold 36px "Fredoka", "Noto Sans TC", sans-serif';
+      g.fillStyle = opts.fg2 || '#db2777';
       g.fillText(lines[1], 256, 108);
     }
     const tex = new T.CanvasTexture(c);
@@ -931,13 +1292,16 @@
 
       this.scene = new T.Scene();
       this.scene.background = this._skyTexture();
-      this.scene.fog = new T.Fog(0xcfeaff, 110, 300);
+      this.scene.fog = new T.FogExp2(0x72efdd, 0.0035);
       this.camera = new T.PerspectiveCamera(42, 1, 0.5, 600);
       this.cam = {
         az: 0.75, el: 0.72, dist: 62,
         tAz: 0.75, tEl: 0.72, tDist: 62,
         target: new T.Vector3(0, 1, 2), tTarget: new T.Vector3(0, 1, 2)
       };
+
+      this.animatedProps = [];
+      this.movingCars = [];
 
       this._buildLights();
       this._buildIsland();
@@ -963,9 +1327,10 @@
       c.height = 256;
       const g = c.getContext('2d');
       const gr = g.createLinearGradient(0, 0, 0, 256);
-      gr.addColorStop(0, '#5bb6f5');
-      gr.addColorStop(0.6, '#a9dcff');
-      gr.addColorStop(1, '#e6f6ff');
+      gr.addColorStop(0, '#55d8c1');
+      gr.addColorStop(0.4, '#72efdd');
+      gr.addColorStop(0.75, '#cbf3f0');
+      gr.addColorStop(1, '#fde8ef');
       g.fillStyle = gr;
       g.fillRect(0, 0, 4, 256);
       const t = new T.CanvasTexture(c);
@@ -974,13 +1339,13 @@
     }
 
     _buildLights() {
-      this.scene.add(new T.HemisphereLight(0xdff0ff, 0x82a56c, 1.05));
-      const sun = new T.DirectionalLight(0xfff5dd, 1.25);
-      sun.position.set(-26, 42, 22);
+      this.scene.add(new T.HemisphereLight(0xffffff, 0x38bdf8, 1.05));
+      const sun = new T.DirectionalLight(0xfffbeb, 1.45);
+      sun.position.set(-26, 48, 26);
       sun.castShadow = true;
       sun.shadow.mapSize.set(2048, 2048);
       const sc = sun.shadow.camera;
-      sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 5; sc.far = 120;
+      sc.left = -38; sc.right = 38; sc.top = 38; sc.bottom = -38; sc.near = 5; sc.far = 140;
       sun.shadow.bias = -0.0006;
       sun.shadow.radius = 2.0;
       this.scene.add(sun);
@@ -993,34 +1358,34 @@
       this.scene.add(this.island);
       const rock = new T.Mesh(
         new T.CylinderGeometry(29.5, 25, 12, 48, 1),
-        new T.MeshLambertMaterial({ color: '#9a8571' })
+        mat('#d8d0cb', { roughness: 0.75 })
       );
       rock.position.y = -6.3;
       rock.receiveShadow = true;
       this.island.add(rock);
       const under = new T.Mesh(
         new T.ConeGeometry(25, 14, 32),
-        new T.MeshLambertMaterial({ color: '#7d6b59' })
+        mat('#7d6b59', { roughness: 0.85 })
       );
       under.rotation.x = Math.PI;
       under.position.y = -19;
       this.island.add(under);
       const grass = new T.Mesh(
         new T.CylinderGeometry(29.5, 29.5, 0.6, 48),
-        new T.MeshLambertMaterial({ color: '#86cf5b' })
+        mat('#86efac', { roughness: 0.65 })
       );
       grass.position.y = -0.3;
       grass.receiveShadow = true;
       this.island.add(grass);
       const sand = new T.Mesh(
         new T.CylinderGeometry(30.3, 30.5, 0.5, 48),
-        new T.MeshLambertMaterial({ color: '#f1deaa' })
+        mat('#fde68a', { roughness: 0.7 })
       );
       sand.position.y = -0.55;
       this.island.add(sand);
       const inner = new T.Mesh(
         new T.CylinderGeometry(9.4, 9.4, 0.04, 48),
-        new T.MeshLambertMaterial({ color: '#9ae06b' })
+        mat('#86efac', { roughness: 0.65 })
       );
       inner.position.y = 0.02;
       inner.receiveShadow = true;
@@ -1028,7 +1393,7 @@
       // pond
       const pond = new T.Mesh(
         new T.CylinderGeometry(2.6, 2.6, 0.06, 32),
-        new T.MeshLambertMaterial({ color: '#4cc3f0', transparent: true, opacity: 0.9 })
+        new T.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.9 })
       );
       pond.position.set(-5, 0.07, -4.5);
       this.island.add(pond);
@@ -1039,7 +1404,7 @@
         const rr = 26 + r() * 3;
         const m = new T.Mesh(
           new T.SphereGeometry(0.8 + r() * 0.9, 12, 10),
-          new T.MeshLambertMaterial({ color: '#8b7d6b' })
+          mat('#cbd5e1', { roughness: 0.6 })
         );
         m.scale.set(1.2, 0.6, 1.0);
         m.position.set(Math.cos(a) * rr, -0.4 + r() * 0.3, Math.sin(a) * rr);
@@ -1078,7 +1443,7 @@
 
       const m = new T.Mesh(
         new T.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 16 }),
-        new T.MeshLambertMaterial({ color })
+        mat(color, { roughness: 0.75 })
       );
       m.rotation.x = -Math.PI / 2;
       m.position.y = y;
@@ -1089,27 +1454,107 @@
 
     _buildRoads() {
       // Main asphalt boulevard with rounded corner curves
-      this._ring(18.5, 9.5, 0.1, '#475569', 0, 3.5, 2.2);
+      this._ring(18.5, 9.5, 0.1, '#1e293b', 0, 3.5, 2.2);
       // Outer sidewalk curb
-      this._ring(18.5, 17.7, 0.14, '#cbd5e1', 0, 3.5, 3.2);
+      this._ring(18.5, 17.7, 0.14, '#94a3b8', 0, 3.5, 3.2);
       // Inner sidewalk curb
-      this._ring(10.3, 9.5, 0.14, '#cbd5e1', 0, 2.4, 2.2);
+      this._ring(10.3, 9.5, 0.14, '#94a3b8', 0, 2.4, 2.2);
 
-      // Lane dashes on straight sections of the avenue
-      const dash = new T.MeshBasicMaterial({ color: '#f8fafc' });
+      // Yellow double centerlines on straight sections of the avenue
+      const yellowLineMat = new T.MeshBasicMaterial({ color: 0xf59e0b });
       for (let i = -13.5; i <= 13.5; i += 2.4) {
-        [[i, -13.6], [i, 13.6], [-13.6, i], [13.6, i]].forEach(([x, z]) => {
-          const d = new T.Mesh(new T.PlaneGeometry(1.1, 0.14), dash);
-          d.rotation.x = -Math.PI / 2;
-          if (Math.abs(z) === 13.6) {
-            d.position.set(x, 0.115, z > 0 ? z - 0.2 : z + 0.2);
-          } else {
-            d.rotation.z = Math.PI / 2;
-            d.position.set(x > 0 ? x - 0.2 : x + 0.2, 0.115, z);
+        [[i, -14.0], [i, 14.0], [-14.0, i], [14.0, i]].forEach(([x, z]) => {
+          for (const off of [-0.14, 0.14]) {
+            const d = new T.Mesh(new T.PlaneGeometry(1.2, 0.08), yellowLineMat);
+            d.rotation.x = -Math.PI / 2;
+            if (Math.abs(z) === 14.0) {
+              d.position.set(x, 0.115, z + off);
+            } else {
+              d.rotation.z = Math.PI / 2;
+              d.position.set(x + off, 0.115, z);
+            }
+            this.island.add(d);
           }
-          this.island.add(d);
         });
       }
+
+      // Zebra crosswalk stripes at key pedestrian crossings
+      const zebraMat = new T.MeshBasicMaterial({ color: 0xffffff });
+      const crosswalkCenters = [
+        { x: 0, z: 14.0, isNS: false },
+        { x: 0, z: -14.0, isNS: false },
+        { x: 14.0, z: 0, isNS: true },
+        { x: -14.0, z: 0, isNS: true }
+      ];
+      crosswalkCenters.forEach(cw => {
+        for (let s = -2.8; s <= 2.8; s += 0.8) {
+          const stripe = new T.Mesh(new T.PlaneGeometry(0.36, 1.8), zebraMat);
+          stripe.rotation.x = -Math.PI / 2;
+          if (cw.isNS) {
+            stripe.rotation.z = Math.PI / 2;
+            stripe.position.set(cw.x + s, 0.118, cw.z);
+          } else {
+            stripe.position.set(cw.x + s, 0.118, cw.z);
+          }
+          this.island.add(stripe);
+        }
+      });
+
+      // Cantilever Traffic Lights at crosswalk intersections
+      const tl1 = createTrafficLight(4.2, 17.6, Math.PI);
+      const tl2 = createTrafficLight(-4.2, -17.6, 0);
+      const tl3 = createTrafficLight(17.6, -4.2, Math.PI / 2);
+      const tl4 = createTrafficLight(-17.6, 4.2, -Math.PI / 2);
+      this.island.add(tl1, tl2, tl3, tl4);
+
+      // Gooseneck Street Lamps along the boulevard sidewalk
+      for (const lx of [-10, 10]) {
+        this.island.add(createGooseneckStreetLamp(lx, 17.6, Math.PI));
+        this.island.add(createGooseneckStreetLamp(lx, -17.6, 0));
+        this.island.add(createGooseneckStreetLamp(17.6, lx, Math.PI / 2));
+        this.island.add(createGooseneckStreetLamp(-17.6, lx, -Math.PI / 2));
+      }
+
+      // Pedestrian benches along the sidewalks
+      this.island.add(createPedestrianBench(7.0, 10.1, 0));
+      this.island.add(createPedestrianBench(-7.0, 10.1, 0));
+      this.island.add(createPedestrianBench(7.0, -10.1, Math.PI));
+      this.island.add(createPedestrianBench(-7.0, -10.1, Math.PI));
+
+      // Setup animated cruising cars along the road!
+      this.movingCars = [];
+      const roadPts = [
+        new T.Vector3(14.0, 0, 11.5),
+        new T.Vector3(14.0, 0, -11.5),
+        new T.Vector3(11.5, 0, -14.0),
+        new T.Vector3(-11.5, 0, -14.0),
+        new T.Vector3(-14.0, 0, -11.5),
+        new T.Vector3(-14.0, 0, 11.5),
+        new T.Vector3(-11.5, 0, 14.0),
+        new T.Vector3(11.5, 0, 14.0)
+      ];
+      const carCurve = new T.CatmullRomCurve3(roadPts, true, 'catmullrom', 0.25);
+      const carCurveLen = carCurve.getLength();
+
+      const carConfigs = [
+        { type: 'taxi', color: 0xfacc15, u: 0.05, speed: 6.2 },
+        { type: 'sedan', color: 0xef4444, u: 0.30, speed: 5.8 },
+        { type: 'truck', color: 0x3b82f6, u: 0.55, speed: 5.2 },
+        { type: 'sedan', color: 0x34d399, u: 0.80, speed: 6.0 }
+      ];
+
+      carConfigs.forEach(cfg => {
+        const mesh = createSimCityVehicle(cfg.type, cfg.color);
+        mesh.castShadow = true;
+        this.island.add(mesh);
+        this.movingCars.push({
+          mesh,
+          curve: carCurve,
+          len: carCurveLen,
+          u: cfg.u,
+          speed: cfg.speed
+        });
+      });
     }
 
     tilePos(index) {
@@ -1177,15 +1622,13 @@
         roof: colors.roof || '#2563eb'
       };
       const lv = Number(info.level || 0);
+      const visLevel = Math.max(1, lv);
       const isBld = tile.type === 'scenario' || (tile.type === 'ai-lot' && info.isBuilding);
 
       if (isBld) {
         const sId = tile.scenarioId || '';
         const name = tile.name || '';
         const icon = tile.icon || '';
-
-        // Display base building (Lv 1) so city is vibrant from the start, upgrading to Lv 2 / Lv 3 on success
-        const visLevel = Math.max(1, lv);
 
         if (sId === 'shift-swap-request' || icon === '🏪' || name.includes('超商')) {
           buildConvenienceStore(bldg, c, visLevel);
@@ -1216,6 +1659,23 @@
       root.userData.label.position.set(0, top + 1.25, 0);
       root.userData.level = lv;
       bldg.userData.popT = 0;
+
+      // Add Tech-Island 3D Canvas Pill Signboard above the entrance!
+      const signText = (tile.icon || '🏢') + ' ' + (tile.name || '智慧商業特區');
+      const sign = createBuildingSignboard(signText, tile.zoneColor || '#f472b6');
+      sign.position.set(0, Math.min(2.4, top * 0.58), 2.22);
+      bldg.add(sign);
+
+      // Add SimCity modular rooftop props for lively urban detail
+      if (isBld) {
+        createRooftopHVAC(bldg, -1.1, top * 0.96, -0.6, 0.75, this.animatedProps);
+        if (visLevel >= 2) {
+          createSolarPanels(bldg, 1.1, top * 0.96, -0.5, 2);
+        }
+        if (visLevel >= 3) {
+          createAntennaMast(bldg, 0, top * 0.98, 0, 2.0, this.animatedProps);
+        }
+      }
     }
 
     _buildDecor() {
@@ -1306,15 +1766,20 @@
     }
 
     _buildSea() {
-      const geo = new T.PlaneGeometry(500, 500, 50, 50);
+      const geo = new T.PlaneGeometry(500, 500, 60, 60);
       geo.rotateX(-Math.PI / 2);
       this.sea = new T.Mesh(
         geo,
-        new T.MeshPhongMaterial({
-          color: '#39a9e6', transparent: true, opacity: 0.93, flatShading: true, shininess: 60
+        new T.MeshStandardMaterial({
+          color: 0x00b4d8,
+          roughness: 0.32,
+          metalness: 0.05,
+          flatShading: false,
+          transparent: true,
+          opacity: 0.94
         })
       );
-      this.sea.position.y = -5.2;
+      this.sea.position.y = -5.1;
       this.sea.receiveShadow = true;
       this.scene.add(this.sea);
       this.seaBase = Float32Array.from(geo.attributes.position.array);
@@ -1323,7 +1788,7 @@
         new T.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 })
       );
       this.foam.rotation.x = Math.PI / 2;
-      this.foam.position.y = -5.15;
+      this.foam.position.y = -5.05;
       this.scene.add(this.foam);
 
       // clouds
@@ -1712,6 +2177,33 @@
         this.wheelSpin.rotation.z += dt * 0.25;
         this.wheelSpin.children.forEach((ch) => {
           if (ch.userData.cab) ch.rotation.z = -this.wheelSpin.rotation.z;
+        });
+      }
+
+      // moving SimCity cruising cars along the avenue
+      if (this.movingCars) {
+        this.movingCars.forEach(car => {
+          car.u = (car.u + (car.speed * dt) / car.len) % 1.0;
+          const pt = car.curve.getPointAt(car.u);
+          const tg = car.curve.getTangentAt(car.u);
+          car.mesh.position.set(pt.x, 0.16, pt.z);
+          car.mesh.rotation.y = Math.atan2(tg.x, tg.z);
+        });
+      }
+
+      // animated props (spinning HVAC fans, blinking antenna beacons)
+      if (this.animatedProps) {
+        this.animatedProps.forEach(p => {
+          if (p.type === 'spinY') {
+            p.mesh.rotation.y += dt * p.speed;
+          } else if (p.type === 'spinZ') {
+            p.mesh.rotation.z += dt * p.speed;
+          } else if (p.type === 'blink') {
+            const v = Math.sin(t * p.speed) > 0 ? 1 : 0.2;
+            if (p.mesh.material) {
+              p.mesh.material.emissiveIntensity = v;
+            }
+          }
         });
       }
 

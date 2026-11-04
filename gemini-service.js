@@ -236,57 +236,64 @@ HIGH-SCHOOL ROLEPLAY RULES:
   }
 
   /**
-   * Fast single-request Gemini API helper with strict AbortController timeout (default 3.5s)
-   * Uses `gemini-3.5-flash-lite` for ultra-low latency so the user never waits!
+   * Fast single-request Gemini API helper with strict AbortController timeout (default 5.5s)
+   * Uses standard CORS-enabled generateContent with `gemini-3.5-flash-lite` for ultra-low latency!
    */
   async function callGeminiFastJSON({
     apiKey,
     systemInstruction,
     inputPrompt,
     schema,
-    timeoutMs = 3500
+    timeoutMs = 5500
   }) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${encodeURIComponent(
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${encodeURIComponent(
         apiKey
       )}`;
+
+      const bodyPayload = {
+        contents: [
+          {
+            parts: [{ text: inputPrompt }]
+          }
+        ],
+        generationConfig: {
+          responseMimeType: 'application/json'
+        }
+      };
+
+      if (systemInstruction) {
+        bodyPayload.systemInstruction = {
+          parts: [{ text: systemInstruction }]
+        };
+      }
+
+      if (schema) {
+        bodyPayload.generationConfig.responseSchema = schema;
+      }
+
       const res = await fetch(url, {
         method: 'POST',
         signal: controller.signal,
         headers: {
-          'Content-Type': 'application/json',
-          'Api-Revision': '2026-05-20'
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          model: 'gemini-3.5-flash-lite',
-          system_instruction: systemInstruction,
-          input: inputPrompt,
-          response_format: {
-            type: 'text',
-            mime_type: 'application/json',
-            schema
-          }
-        })
+        body: JSON.stringify(bodyPayload)
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        if (data.output_text) {
-          return JSON.parse(data.output_text);
-        }
-        const steps = data.steps || [];
-        for (let i = steps.length - 1; i >= 0; i--) {
-          if (steps[i].type === 'model_output' && steps[i].content) {
-            for (const c of steps[i].content) {
-              if (c.text) return JSON.parse(c.text);
-            }
-          }
-        }
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
       }
-      throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (rawText) {
+        return JSON.parse(rawText);
+      }
+      throw new Error('No candidate text returned');
     } finally {
       clearTimeout(timer);
     }
@@ -952,6 +959,8 @@ HIGH-SCHOOL ROLEPLAY RULES:
 
     const systemInstruction = `You are roleplaying as ${scenario.aiName} (${scenario.aiRole}, personality: ${scenario.aiPersonality}) in an everyday spoken workplace English conversation with a Taiwanese high school student (${scenario.userRole}) at CEFR A2~B1 level.
 
+Scenario Title: ${scenario.title}
+Scenario Category: ${scenario.category}
 Scenario Background:
 ${scenario.background}
 
@@ -959,10 +968,12 @@ Student's 3 Mission Objectives:
 ${(scenario.objectives || []).map((o, i) => `${i + 1}. ${o}`).join('\n')}
 
 MANDATORY PEDAGOGICAL GUIDELINES:
-1. DYNAMIC RELEVANCE: You MUST listen and directly respond to the specific content, details, names, times, or questions the student actually said. NEVER give a canned or disconnected reply.
-2. OBJECTIVE TRACKING: Check which of the 3 mission objectives the student has completed, and determine which objective is still missing.
-3. SCAFFOLDING & GUIDING: Speak in character as ${scenario.aiName}. Keep your spoken reply to 1-2 short, friendly, natural sentences (around 15-25 words). Naturally ask a guiding follow-up question that leads the student to practice the next uncompleted mission objective.
-4. STARTER HINT: Provide a simple English phrase starter ("guidingHint") that the student can say next to answer your question.`;
+1. STRICT THEMATIC ADHERENCE: You are strictly inside the context of "${scenario.title}" (${scenario.background}). Everything you say must stay 100% focused on this workplace situation. Never shift to another topic or generic chit-chat.
+2. DYNAMIC RELEVANCE: You MUST listen and directly respond to the specific content, details, names, times, items, or questions the student actually said. NEVER give a canned or disconnected reply.
+3. OBJECTIVE TRACKING: Check which of the 3 mission objectives the student has completed, and determine which objective is still missing.
+4. SCAFFOLDING & GUIDING: Speak in character as ${scenario.aiName}. Keep your spoken reply to 1-2 short, friendly, natural sentences (around 15-25 words). Naturally ask a guiding follow-up question that leads the student to practice the next uncompleted mission objective.
+5. TRADITIONAL CHINESE TRANSLATION: You MUST provide an accurate Traditional Chinese (繁體中文) translation ("zh") of your spoken reply.
+6. STARTER HINT: Provide a simple English phrase starter ("guidingHint") that the student can say next to answer your question.`;
 
     const inputPrompt = `Recent Conversation:\n${priorHistory}\n\nStudent just said: "${userUtterance}"\n\nPlease formulate your dynamic response as ${scenario.aiName}.`;
 
@@ -982,7 +993,7 @@ MANDATORY PEDAGOGICAL GUIDELINES:
         systemInstruction,
         inputPrompt,
         schema,
-        timeoutMs: 3200
+        timeoutMs: 5000
       });
     } catch (e) {
       console.warn('Gemini dynamic turn fallback to offline engine:', e);

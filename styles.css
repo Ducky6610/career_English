@@ -1657,14 +1657,57 @@ body {
 
 .btn-icon-tts,
 .btn-mini-speak,
-.btn-tts-upgrade {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  padding: 4px 8px;
-  border-radius: 6px;
+.btn-tts-upgrade,
+.btn-rescue-tts {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #fbcfe8;
+  color: #db2777;
+  padding: 4px 10px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 6px rgba(244, 114, 182, 0.15);
+}
+
+.btn-icon-tts:hover,
+.btn-mini-speak:hover,
+.btn-tts-upgrade:hover,
+.btn-rescue-tts:hover {
+  background: #fdf2f8;
+  border-color: #f472b6;
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(244, 114, 182, 0.28);
+}
+
+.btn-icon-tts.loading,
+.btn-mini-speak.loading,
+.btn-rescue-tts.loading,
+.btn-tts-upgrade.loading {
+  background: #fef08a !important;
+  color: #854d0e !important;
+  border-color: #eab308 !important;
+  animation: tts-pulse 0.9s infinite alternate;
+}
+
+.btn-icon-tts.playing,
+.btn-mini-speak.playing,
+.btn-rescue-tts.playing,
+.btn-tts-upgrade.playing {
+  background: #ec4899 !important;
+  color: #ffffff !important;
+  border-color: #db2777 !important;
+  animation: tts-glow 0.8s infinite alternate;
+}
+
+@keyframes tts-pulse {
+  from { opacity: 0.7; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1.04); }
+}
+
+@keyframes tts-glow {
+  from { box-shadow: 0 0 4px #f472b6; }
+  to { box-shadow: 0 0 12px #ec4899; }
 }
 
 .full-width {

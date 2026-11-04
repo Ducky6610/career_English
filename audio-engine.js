@@ -372,46 +372,32 @@ registerProcessor('pcm-capture-processor', PcmCaptureProcessor);
   }
 
   /**
-   * Speaks with Gemini 3.8 Flash TTS (`gemini-3.8-flash-tts`) when API Key is provided
+   * Speaks with Gemini 3.8 Flash TTS (`gemini-3.8-flash-tts`) via standard CORS-enabled generateContent
    */
-  let sharedTtsAudioContext = null;
-
   async function speakWithGeminiTTS(apiKey, text, voiceName = 'Kore', myAbortId) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/interactions?key=${encodeURIComponent(
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent?key=${encodeURIComponent(
       apiKey
     )}`;
     const res = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Api-Revision': '2026-05-20'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gemini-3.8-flash-tts',
-        input: [
+        contents: [
           {
-            type: 'user_input',
-            content: [
-              {
-                type: 'text',
-                text,
-                annotations: [
-                  {
-                    type: 'speech_metadata',
-                    style: 'natural, warm, authentic workplace conversation'
-                  }
-                ]
-              }
-            ]
+            parts: [{ text }]
           }
         ],
-        response_format: {
-          type: 'audio',
-          mime_type: 'audio/wav',
-          sample_rate: 24000
-        },
-        generation_config: {
-          speech_config: [{ voice: voiceName || 'Kore' }]
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: voiceName || 'Kore'
+              }
+            }
+          }
         }
       })
     });
@@ -421,54 +407,48 @@ registerProcessor('pcm-capture-processor', PcmCaptureProcessor);
     }
 
     const data = await res.json();
-    let base64Audio = data.output_audio?.data;
-    if (!base64Audio && data.steps) {
-      for (let i = data.steps.length - 1; i >= 0; i--) {
-        const content = data.steps[i]?.content || [];
-        for (const item of content) {
-          if (item.type === 'audio' && item.data) {
-            base64Audio = item.data;
-            break;
-          }
-        }
-      }
-    }
+    const base64Audio = data.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) throw new Error('No audio data returned');
     if (myAbortId !== cloudSpeechAbortId) return;
 
-    if (!sharedTtsAudioContext) {
-      sharedTtsAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (sharedTtsAudioContext.state === 'suspended') {
-      await sharedTtsAudioContext.resume();
-    }
-
+    // Convert base64 WAV to Blob URL for instant cross-browser playback
     const binaryString = atob(base64Audio);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const audioBuffer = await sharedTtsAudioContext.decodeAudioData(bytes.buffer.slice(0));
+    const blob = new Blob([bytes], { type: 'audio/wav' });
+    const blobUrl = URL.createObjectURL(blob);
+    const audio = new Audio(blobUrl);
+
+    activeCloudAudios.push(audio);
     startSimulatedSpeechVisuals();
 
-    return new Promise((resolve) => {
-      const source = sharedTtsAudioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(sharedTtsAudioContext.destination);
-      source.onended = () => {
+    return new Promise((resolve, reject) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(blobUrl);
         stopSimulatedSpeechVisuals();
         resolve();
       };
-      source.start(0);
+      audio.onerror = (e) => {
+        URL.revokeObjectURL(blobUrl);
+        stopSimulatedSpeechVisuals();
+        reject(e);
+      };
+      audio.play().catch((err) => {
+        URL.revokeObjectURL(blobUrl);
+        stopSimulatedSpeechVisuals();
+        reject(err);
+      });
     });
   }
 
   /**
    * Main TTS entry point used across the entire app:
    * Priority 1: Gemini 3.8 Flash TTS (`gemini-3.8-flash-tts`) if API Key is set
-   * Priority 2: Cloud Neural Human Audio Stream (pre-buffered natural human speech)
-   * Priority 3: Curated Browser Neural Voice (chunked by sentence, strictly banning macOS robotic voices)
+   * Priority 2: Curated Browser Neural Voice (instant, chunked by sentence, zero network delay)
+   * Priority 3: Cloud Neural Human Audio Stream (fallback)
    */
   async function speakWithBrowserTTS(text, onStart, onEnd, options = {}) {
     stopAllActiveSpeech();
@@ -500,47 +480,54 @@ registerProcessor('pcm-capture-processor', PcmCaptureProcessor);
         if (myAbortId === cloudSpeechAbortId && onEnd) onEnd();
         return;
       } catch (err) {
-        console.warn('Gemini 3.8 TTS fallback to Cloud Neural Voice:', err);
+        console.warn('Gemini 3.8 TTS fallback to Browser Speech:', err);
       }
     }
 
-    // 2. Try Cloud Neural Human Voice (works without API Key!)
-    const cloudPlayed = await speakWithCloudNeuralAudio(text, aiVoice, myAbortId);
-    if (cloudPlayed) {
-      if (myAbortId === cloudSpeechAbortId && onEnd) onEnd();
-      return;
-    }
+    // 2. Fast Browser SpeechSynthesis fallback
+    if ('speechSynthesis' in window) {
+      try {
+        const voices = await loadVoicesAsync();
+        const bestVoice = selectBestHumanEnglishVoice(voices, aiVoice);
+        const chunks = splitIntoSpeechChunks(text);
 
-    // 3. Offline fallback: Curated Browser Voice (strictly excluding Albert/Fred/Meijia, chunked by sentence)
-    if (!('speechSynthesis' in window)) {
-      if (onEnd) onEnd();
-      return;
-    }
-
-    const voices = await loadVoicesAsync();
-    const bestVoice = selectBestHumanEnglishVoice(voices, aiVoice);
-    const chunks = splitIntoSpeechChunks(text);
-
-    startSimulatedSpeechVisuals();
-    for (const chunk of chunks) {
-      if (myAbortId !== cloudSpeechAbortId) break;
-      await new Promise((resolve) => {
-        const utterance = new SpeechSynthesisUtterance(chunk);
-        if (bestVoice) {
-          utterance.voice = bestVoice;
-          utterance.lang = bestVoice.lang || 'en-US';
-        } else {
-          utterance.lang = 'en-US';
+        startSimulatedSpeechVisuals();
+        for (const chunk of chunks) {
+          if (myAbortId !== cloudSpeechAbortId) break;
+          await new Promise((resolve) => {
+            const utterance = new SpeechSynthesisUtterance(chunk);
+            if (bestVoice) {
+              utterance.voice = bestVoice;
+              utterance.lang = bestVoice.lang || 'en-US';
+            } else {
+              utterance.lang = 'en-US';
+            }
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve();
+            window.speechSynthesis.speak(utterance);
+          });
         }
-        utterance.rate = 0.98;
-        utterance.pitch = 1.0;
-        utterance.onend = () => resolve();
-        utterance.onerror = () => resolve();
-        window.speechSynthesis.speak(utterance);
-      });
+        stopSimulatedSpeechVisuals();
+        if (myAbortId === cloudSpeechAbortId && onEnd) onEnd();
+        return;
+      } catch (speechErr) {
+        console.warn('SpeechSynthesis error:', speechErr);
+      }
     }
+
+    // 3. Fallback to Cloud Neural Audio Stream if SpeechSynthesis not available
+    try {
+      const cloudPlayed = await speakWithCloudNeuralAudio(text, aiVoice, myAbortId);
+      if (cloudPlayed) {
+        if (myAbortId === cloudSpeechAbortId && onEnd) onEnd();
+        return;
+      }
+    } catch (_) {}
+
     stopSimulatedSpeechVisuals();
-    if (myAbortId === cloudSpeechAbortId && onEnd) onEnd();
+    if (onEnd) onEnd();
   }
 
   class AudioEngine {

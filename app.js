@@ -447,6 +447,7 @@
       });
 
       document.getElementById('back-to-map-btn')?.addEventListener('click', () => {
+        this.stopCallOnly();
         this.switchView('hub');
       });
 
@@ -546,16 +547,23 @@
         this.handleSaveCustomScenario();
       });
 
-      // Enter building button: only permitted when player is currently at that building!
+      // Enter building button: seamlessly enter this building challenge!
       document.getElementById('start-roleplay-from-hub-btn')?.addEventListener('click', () => {
-        const curTile = BOARD_TILES[this.tycoon.playerTileIndex];
-        const isAtBuilding =
-          (curTile?.scenarioId === this.selectedScenario?.id) ||
-          (curTile?.type === 'ai-lot' && this.selectedScenario?.id?.startsWith('ai-'));
+        const s = this.selectedScenario;
+        if (!s) return;
 
-        if (!isAtBuilding) {
-          this.showToast(`🎲 請先擲 3D 骰子走到此建築才能開始任務！（你目前在 #${this.tycoon.playerTileIndex + 1} 格）`);
-          return;
+        this.stopCallOnly();
+
+        const targetTileIndex = BOARD_TILES.findIndex(
+          (t) => t.scenarioId === s.id || (t.type === 'ai-lot' && s.id.startsWith('ai-'))
+        );
+        if (targetTileIndex >= 0) {
+          this.tycoon.playerTileIndex = targetTileIndex;
+          this.saveTycoonState();
+          this.renderSimCityBoard();
+          if (typeof this.updatePawnPositionSmooth === 'function') {
+            this.updatePawnPositionSmooth(targetTileIndex);
+          }
         }
 
         document.getElementById('building-task-modal')?.classList.add('hidden');
@@ -608,11 +616,11 @@
       if (this.apiKey) {
         const isDefault = this.apiKey === DEFAULT_API_KEY;
         if (badge) {
-          badge.textContent = `⚡ Gemini Live 已啟用 (${this.liveModel})`;
+          badge.textContent = `⚡ Gemini 3.5 AI 雙語導師已就緒`;
           badge.className = 'status-pill status-connected';
         }
         if (modeLabel) {
-          modeLabel.textContent = `語音引擎：${this.liveModel} (24kHz 真人雙向語音${
+          modeLabel.textContent = `語音引擎：Gemini 3.5 Flash 高速動態引導 ＋ 3.8 Flash 真人語音 (即時繁中翻譯${
             isDefault ? '・系統預設綁定' : ''
           }) ｜ 程度：高中生 A2~B1`;
         }
@@ -1056,7 +1064,15 @@
           `,
           () => {
             document.getElementById('event-card-tts-btn')?.addEventListener('click', () => {
-              speakWithBrowserTTS(card.tipEn, null, null, { apiKey: this.apiKey });
+              const btn = document.getElementById('event-card-tts-btn');
+              if (btn) btn.textContent = '⏳ 發音準備中...';
+              speakWithBrowserTTS(card.tipEn, () => {
+                if (btn) btn.textContent = '🎵 播放中...';
+              }, () => {
+                if (btn) btn.textContent = '🔊 聽真人發音';
+              }, { apiKey: this.apiKey }).catch(() => {
+                if (btn) btn.textContent = '🔊 聽真人發音';
+              });
             });
           }
         );
@@ -1252,27 +1268,46 @@
         .join('');
 
       phraseList.querySelectorAll('.btn-icon-tts').forEach((btn) => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
           const phrase = s.suggestedPhrases[Number(btn.dataset.phraseIdx)];
-          if (phrase) {
-            speakWithBrowserTTS(phrase.en, null, null, {
+          if (!phrase) return;
+
+          phraseList.querySelectorAll('.btn-icon-tts').forEach((b) => {
+            b.classList.remove('loading', 'playing');
+            b.textContent = '🔊';
+          });
+
+          btn.classList.add('loading');
+          btn.textContent = '⏳';
+
+          speakWithBrowserTTS(
+            phrase.en,
+            () => {
+              btn.classList.remove('loading');
+              btn.classList.add('playing');
+              btn.textContent = '🎵';
+            },
+            () => {
+              btn.classList.remove('loading', 'playing');
+              btn.textContent = '🔊';
+            },
+            {
               apiKey: this.apiKey,
               aiVoice: s.aiVoice
-            });
-          }
+            }
+          ).catch(() => {
+            btn.classList.remove('loading', 'playing');
+            btn.textContent = '🔊';
+          });
         });
       });
 
-      // Update enter button: strict check so students cannot jump to non-landed buildings!
+      // Update enter button: always ready to challenge this building!
       const enterBtn = document.getElementById('start-roleplay-from-hub-btn');
       if (enterBtn) {
-        if (isPlayerAtThisBuilding) {
-          enterBtn.disabled = false;
-          enterBtn.textContent = `🏢 進入此建築挑戰【${stageConfig.stageBadge.split('：')[1] || '建案任務'}】！`;
-        } else {
-          enterBtn.disabled = true;
-          enterBtn.textContent = `🎲 請擲 3D 骰子前進至此建築以解鎖任務 (你目前在 #${this.tycoon.playerTileIndex + 1} 格)`;
-        }
+        enterBtn.disabled = false;
+        enterBtn.textContent = `🏢 進入此建築挑戰【${displayTitle}】！`;
       }
     }
 
@@ -1429,6 +1464,38 @@
       });
     }
 
+    stopCallOnly() {
+      if (this.utteranceSilenceTimer) {
+        clearTimeout(this.utteranceSilenceTimer);
+        this.utteranceSilenceTimer = null;
+      }
+      this.pendingUserSegments = [];
+      this.currentInterimUserText = '';
+      if (this.callTimerInterval) {
+        clearInterval(this.callTimerInterval);
+        this.callTimerInterval = null;
+      }
+      this.isCallActive = false;
+      this.updateCallButtonsUI();
+      if (this.speechRecognition) {
+        try {
+          this.speechRecognition.abort();
+        } catch (_) {}
+        this.speechRecognition = null;
+      }
+      this.liveManager?.close();
+      this.liveManager = null;
+      if (this.audioEngine) {
+        const engineToStop = this.audioEngine;
+        this.audioEngine = null;
+        engineToStop.stop().catch(() => {});
+      }
+      if (window.ExecVoice?.stopAllActiveSpeech) {
+        window.ExecVoice.stopAllActiveSpeech();
+      }
+      document.getElementById('voice-orb')?.classList.remove('ai-speaking', 'user-speaking');
+    }
+
     async startVoiceCall() {
       if (this.isCallActive) return;
 
@@ -1441,93 +1508,8 @@
       this.callStartTime = Date.now();
       this.callTimerInterval = setInterval(() => this.updateCallTimerUI(), 1000);
 
-      if (this.apiKey) {
-        // Only open AudioWorklet PCM capture when streaming to Gemini Live WebSocket!
-        // This avoids competing with browser SpeechRecognition for the microphone in zero-key mode.
-        this.callMode = 'gemini-live';
-        this.audioEngine = new AudioEngine({
-          onPcmChunk: (base64Pcm) => {
-            if (this.liveManager && this.callMode === 'gemini-live') {
-              this.liveManager.sendAudioChunk(base64Pcm);
-            }
-          },
-          onVolumeChange: ({ micLevel, aiLevel, micSpectrum, aiSpectrum }) => {
-            this.updateVisualizerUI(micLevel, aiLevel, micSpectrum, aiSpectrum);
-          },
-          onAiSpeakingChange: (speaking) => {
-            const orb = document.getElementById('voice-orb');
-            orb?.classList.toggle('ai-speaking', speaking);
-            document.getElementById('orb-status-label').textContent = speaking
-              ? `${this.selectedScenario.aiName} 正在說話...`
-              : '🎙️ 換你說英文囉！(直接對麥克風開口，或使用下方輸入框)';
-          }
-        });
-
-        try {
-          await this.audioEngine.startCapture();
-        } catch (micErr) {
-          console.warn('Microphone access denied or unavailable:', micErr);
-        }
-
-        document.getElementById('orb-status-label').textContent = `正在連線至 ${this.liveModel}...`;
-
-        this.liveManager = new GeminiLiveSessionManager({
-          apiKey: this.apiKey,
-          model: this.liveModel,
-          scenario: this.selectedScenario,
-          onAudioChunk: (base64Audio) => {
-            this.audioEngine?.enqueuePcm24kBase64(base64Audio);
-          },
-          onUserTranscript: (text, isFinal) => {
-            this.handleLiveUserTranscript(
-              applyScenarioPhoneticFixes(text, this.selectedScenario),
-              isFinal
-            );
-          },
-          onAiTranscript: (text) => {
-            this.handleLiveAiTranscript(text);
-          },
-          onTurnComplete: () => {
-            this.finalizeCurrentAiTurn();
-          },
-          onInterrupted: () => {
-            this.audioEngine?.interruptPlayback();
-            this.finalizeCurrentAiTurn();
-          },
-          onStatusChange: (status) => {
-            if (status === 'connected') {
-              document.getElementById('orb-status-label').textContent =
-                '🟢 已連線！AI 對練夥伴即將開口...';
-            } else if (status === 'disconnected' && this.isCallActive) {
-              document.getElementById('orb-status-label').textContent = '連線已結束';
-            }
-          },
-          onError: (errMsg) => {
-            this.showToast(`${errMsg}`);
-            if (this.audioEngine) {
-              this.audioEngine.stop().catch(() => {});
-              this.audioEngine = null;
-            }
-            this.callMode = 'browser-demo';
-            this.startBrowserDemoVoiceSession();
-          }
-        });
-
-        try {
-          await this.liveManager.connect();
-        } catch (err) {
-          console.error('Failed to connect Gemini Live:', err);
-          if (this.audioEngine) {
-            this.audioEngine.stop().catch(() => {});
-            this.audioEngine = null;
-          }
-          this.callMode = 'browser-demo';
-          this.startBrowserDemoVoiceSession();
-        }
-      } else {
-        this.callMode = 'browser-demo';
-        this.startBrowserDemoVoiceSession();
-      }
+      this.callMode = 'browser-demo';
+      this.startBrowserDemoVoiceSession();
     }
 
     /**
@@ -1905,7 +1887,8 @@
       this.transcriptTurns.push({
         role,
         text,
-        zhTranslation,
+        zhTranslation: zhTranslation || '',
+        zh: zhTranslation || '',
         guidingHint,
         timestamp: Date.now(),
         isStreaming: false
@@ -1984,9 +1967,17 @@
 
       box.querySelectorAll('.btn-mini-speak').forEach((btn) => {
         btn.addEventListener('click', () => {
-          speakWithBrowserTTS(btn.dataset.speak, null, null, {
+          const original = btn.textContent;
+          btn.textContent = '⏳';
+          speakWithBrowserTTS(btn.dataset.speak, () => {
+            btn.textContent = '🎵';
+          }, () => {
+            btn.textContent = original;
+          }, {
             apiKey: this.apiKey,
             aiVoice: this.selectedScenario?.aiVoice
+          }).catch(() => {
+            btn.textContent = original;
           });
         });
       });
@@ -2138,12 +2129,20 @@
         .join('');
 
       listEl.querySelectorAll('.btn-rescue-tts').forEach((btn) => {
-        btn.addEventListener('click', () =>
-          speakWithBrowserTTS(btn.dataset.en, null, null, {
+        btn.addEventListener('click', () => {
+          const original = btn.textContent;
+          btn.textContent = '⏳ 讀取中';
+          speakWithBrowserTTS(btn.dataset.en, () => {
+            btn.textContent = '🎵 播放中';
+          }, () => {
+            btn.textContent = original;
+          }, {
             apiKey: this.apiKey,
             aiVoice: this.selectedScenario?.aiVoice
-          })
-        );
+          }).catch(() => {
+            btn.textContent = original;
+          });
+        });
       });
 
       listEl.querySelectorAll('.btn-rescue-use').forEach((btn) => {
@@ -2566,12 +2565,20 @@
       `;
 
       container.querySelectorAll('.btn-tts-upgrade').forEach((btn) => {
-        btn.addEventListener('click', () =>
-          speakWithBrowserTTS(btn.dataset.tts, null, null, {
+        btn.addEventListener('click', () => {
+          const original = btn.textContent;
+          btn.textContent = '⏳';
+          speakWithBrowserTTS(btn.dataset.tts, () => {
+            btn.textContent = '🎵';
+          }, () => {
+            btn.textContent = original;
+          }, {
             apiKey: this.apiKey,
             aiVoice: this.selectedScenario?.aiVoice
-          })
-        );
+          }).catch(() => {
+            btn.textContent = original;
+          });
+        });
       });
     }
 
